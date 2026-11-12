@@ -1,15 +1,44 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { tx } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { tx, q } from "@/lib/db";
+import { requireUser, can } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
+import { log } from "@/lib/activity";
 import { createSale, SaleError, type SaleInput } from "@/lib/sales";
+import { num } from "@/lib/util";
 
 export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id?: number; error?: string }> {
   const user = await requireUser("pos");
   const s = await getSettings();
+  const canPrice = can(user, "sales.price");
+  const canDiscount = can(user, "sales.discount");
+  const notes: string[] = [];
+
+  // Enforce price / discount permissions on the server, whatever the browser sent.
+  for (const l of payload.lines) {
+    if (!l.product_id) continue;
+    const [p] = await q<{ name: string; price: number }>("SELECT name, price FROM products WHERE id=$1", [l.product_id]);
+    let list = p?.price ?? 0;
+    if (l.unit_id) {
+      const [u] = await q<{ price: number | null }>("SELECT price FROM units WHERE id=$1", [l.unit_id]);
+      if (u?.price) list = u.price;
+    }
+    if (!canPrice) l.unit_price = list;
+    else if (Math.abs(l.unit_price - list) > 0.004) notes.push(`${p?.name}: price ${num(list)} → ${num(l.unit_price)}`);
+    if (!canDiscount) l.discount = 0;
+    else if (l.discount) notes.push(`${p?.name}: discount ${num(l.discount)}`);
+  }
+  if (!can(user, "sales.credit") && payload.payments.some((p) => p.method === "credit")) {
+    return { error: "Your account is not allowed to sell on credit" };
+  }
   try {
-    const id = await tx((t) => createSale(t, s, { ...payload, userId: user.id }));
+    const id = await tx(async (t) => {
+      const sid = await createSale(t, s, { ...payload, userId: user.id });
+      const [row] = await t<{ number: string; total: number; paid: number }>("SELECT number, total, paid FROM sales WHERE id=$1", [sid]);
+      if (!can(user, "sales.credit") && row.paid + 0.004 < row.total) throw new SaleError("Full payment is needed — your account can't sell on credit");
+      await log(user.id, "Sale", `${row.number} · ${s.currency} ${num(row.total)}${payload.customer.name ? ` · ${payload.customer.name}` : ""}${notes.length ? ` · ${notes.join("; ")}` : ""}`, `/sales/${sid}`, t);
+      return sid;
+    });
     revalidatePath("/");
     revalidatePath("/sales");
     revalidatePath("/products");

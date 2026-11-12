@@ -1,5 +1,5 @@
 import { q } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, can } from "@/lib/auth";
 import { fmtDate, num, todayDubai, methodLabel } from "@/lib/util";
 import { PageHeader, Empty } from "@/components/ui";
 import Submit from "@/components/submit";
@@ -41,7 +41,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                   <tr key={e.id}>
                     <td>{fmtDate(e.date)}</td><td>{e.category}</td><td className="text-slate-500">{e.description}</td><td className="text-slate-500">{methodLabel(e.method)}</td>
                     <td className="text-right tabular-nums">{num(e.vat)}</td><td className="text-right tabular-nums font-medium">{num(e.total)}</td>
-                    <td className="text-right">{user.role === "owner" && <form action={deleteExpense}><input type="hidden" name="id" value={e.id} /><Submit className="btn-ghost btn-sm" confirm="Delete this expense?">Delete</Submit></form>}</td>
+                    <td className="text-right">{can(user, "expenses.delete") && <form action={deleteExpense}><input type="hidden" name="id" value={e.id} /><Submit className="btn-ghost btn-sm" confirm="Delete this expense?">Delete</Submit></form>}</td>
                   </tr>
                 ))}
               </tbody>

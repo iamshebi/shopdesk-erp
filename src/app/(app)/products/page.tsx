@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { q } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, can } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { STOCK_SQL } from "@/lib/stock";
 import { num } from "@/lib/util";
@@ -8,7 +8,8 @@ import { PageHeader, Badge, Empty } from "@/components/ui";
 import { Plus, Upload } from "lucide-react";
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireUser("products");
+  const user = await requireUser("products.view");
+  const showCost = can(user, "products.cost");
   const sp = await searchParams;
   const s = await getSettings();
   const term = (sp.q ?? "").trim();
@@ -38,9 +39,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   );
   return (
     <div>
-      <PageHeader title="Stock" subtitle={`${totals[0].items} products · stock value ${s.currency} ${num(totals[0].value)} at cost`}>
-        <Link href="/products/import" className="btn-ghost"><Upload size={16} /> Import CSV</Link>
-        <Link href="/products/new" className="btn-primary"><Plus size={16} /> Add product</Link>
+      <PageHeader title="Stock" subtitle={`${totals[0].items} products${showCost ? ` · stock value ${s.currency} ${num(totals[0].value)} at cost` : ""}`}>
+        {can(user, "products.import") && <Link href="/products/import" className="btn-ghost"><Upload size={16} /> Import</Link>}
+        {can(user, "products.edit") && <Link href="/products/new" className="btn-primary"><Plus size={16} /> Add product</Link>}
       </PageHeader>
       <form className="mb-4 flex flex-wrap gap-2">
         <input name="q" defaultValue={term} placeholder="Search name, brand, SKU, barcode or IMEI…" className="input max-w-md" autoFocus />
@@ -59,7 +60,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <Empty>No products yet. Add one or import your list from Excel/CSV.</Empty>
         ) : (
           <table className="tbl">
-            <thead><tr><th>Product</th><th>Category</th><th>SKU</th><th className="text-right">Cost</th><th className="text-right">Price</th><th className="text-right">In stock</th></tr></thead>
+            <thead><tr><th>Product</th><th>Category</th><th>SKU</th>{showCost && <th className="text-right">Cost</th>}<th className="text-right">Price</th><th className="text-right">In stock</th></tr></thead>
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id}>
@@ -69,7 +70,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                   </td>
                   <td className="text-slate-500">{p.category}</td>
                   <td className="font-mono text-xs text-slate-500">{p.sku}</td>
-                  <td className="text-right tabular-nums text-slate-500">{num(p.cost)}</td>
+                  {showCost && <td className="text-right tabular-nums text-slate-500">{num(p.cost)}</td>}
                   <td className="text-right tabular-nums font-medium">{num(p.price)}</td>
                   <td className="text-right tabular-nums">
                     {p.is_service ? "—" : p.stock <= 0 || p.stock <= p.reorder_level ? <Badge tone={p.stock <= 0 ? "red" : "amber"}>{p.stock}</Badge> : p.stock}

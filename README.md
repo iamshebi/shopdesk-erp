@@ -18,7 +18,9 @@ One codebase. Each shop gets its own copy (own database, own logo, own name).
 | **Customers** | Auto-saved from sales and repairs, history, outstanding balances, receive payments |
 | **Expenses** | Monthly expenses with optional input VAT |
 | **Reports** | Sales & profit, by category / payment method / staff, day close (expected cash in drawer), VAT 201 summary, stock valuation, slow and negative stock |
-| **Staff** | Owner, manager, cashier and technician roles |
+| **Staff & roles** | Owner creates roles with tick-box permissions (like Shopify staff), each staff member has their own login; price/discount/credit limits enforced at the till; staff can be limited to their own invoices |
+| **Activity log** | Who did what and when: sales, refunds, price changes, stock adjustments, logins, staff and role changes |
+| **Import / export / backup** | Excel & CSV import (products, customers), Excel/CSV export of every list, one-file full backup and restore |
 
 ## Tech
 
@@ -27,6 +29,23 @@ The database tables create themselves on first start, so a new shop needs no mig
 
 * With `DATABASE_URL` set → uses that Postgres (Supabase, Neon, any Postgres).
 * Without it → uses an embedded database in `./.data` (local development only).
+
+## Windows desktop app (offline, branded per shop)
+
+Each client gets their own installer with their name and icon. Data stays on the shop computer
+(`%APPDATA%\<Product>\data`), a backup is saved automatically every day to `Documents\<Product> Backups` (last 30 kept),
+and other counters / phones on the shop Wi-Fi can open the address shown in **File → Use on other devices**.
+
+**Make a new client brand:** copy `brands/default` to `brands/<client>`, edit `brand.json` (productName, executableName, appId)
+and replace `icon.png` (512×512). The shop's logo, colours, TRN and invoice details are then set inside the app's Settings.
+
+**Build the installer (free, no Windows PC needed):** on GitHub open *Actions → Build Windows installer → Run workflow*,
+type the brand folder name (e.g. `zaitoon`), and download the `.exe` from the finished run.
+On a Windows PC you can also run `node scripts/build-desktop.mjs --brand zaitoon --pack`.
+
+The first launch shows a Windows SmartScreen warning ("unknown publisher") until you buy a code-signing certificate;
+click *More info → Run anyway*. Windows Firewall will ask to allow network access — allow it on private networks
+so other counters can connect.
 
 ## Run locally
 

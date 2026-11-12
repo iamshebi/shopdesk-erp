@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { tx, nextNumber, q } from "@/lib/db";
+import { log } from "@/lib/activity";
 import { requireUser } from "@/lib/auth";
 import { str, numf } from "@/lib/util";
 
@@ -42,6 +43,7 @@ export async function createBuyback(_: unknown, fd: FormData): Promise<{ error?:
       "INSERT INTO units (product_id, imei, cost, price, source, margin_scheme, buyback_id, notes) VALUES ($1,$2,$3,$4,'buyback',$5,$6,$7)",
       [productId, imei, price, sell > 0 ? sell : null, fd.get("margin_scheme") === "on", b.id, str(fd, "condition")],
     );
+    await log(user.id, "Used device bought", `${number} · IMEI ${imei} · ${price.toFixed(2)} · ${str(fd, "seller_name")}`, `/print/buyback/${b.id}`, t);
     return b.id;
   });
   revalidatePath("/buyback");

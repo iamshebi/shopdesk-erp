@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { one } from "@/lib/db";
-import { getUser, can } from "@/lib/auth";
+import { getUser, canAny } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import Sidebar from "@/components/sidebar";
 
@@ -10,12 +10,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getUser();
   if (!user) redirect("/login");
   const s = await getSettings();
-  const areas = ["dashboard", "pos", "sales", "repairs", "buyback", "products", "imei", "purchases", "suppliers", "customers", "expenses", "reports", "settings"].filter((a) =>
-    can(user, a),
-  );
+  const NAV_PERMS: Record<string, string[]> = {
+    dashboard: [], pos: ["pos"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
+    purchases: ["purchases"], suppliers: ["suppliers"], customers: ["customers"], expenses: ["expenses"],
+    reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity"],
+  };
+  const areas = Object.entries(NAV_PERMS).filter(([, p]) => p.length === 0 || canAny(user, p)).map(([a]) => a);
   return (
     <div className="flex min-h-screen">
-      <Sidebar shopName={s.shop_name} logo={s.logo} userName={user.name} role={user.role} areas={areas} />
+      <Sidebar
+        shopName={s.shop_name}
+        logo={s.logo}
+        userName={user.name}
+        role={user.role}
+        areas={areas}
+        reportsHref={canAny(user, ["reports"]) ? "/reports" : canAny(user, ["reports.day"]) ? "/reports/day" : "/reports/vat"}
+        settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : "/settings/activity"}
+      />
       <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8">{children}</main>
     </div>
   );

@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { tx, nextNumber, q, one } from "@/lib/db";
+import { log } from "@/lib/activity";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { r2, str, numf } from "@/lib/util";
@@ -69,6 +70,7 @@ export async function createPurchase(_: unknown, fd: FormData) {
       // keep last purchase cost on the product
       await t("UPDATE products SET cost = $1 WHERE id=$2", [l.unit_cost, l.product_id]);
     }
+    await log(user.id, "Purchase", `${number} · ${total.toFixed(2)}`, `/purchases/${p.id}`, t);
     return p.id;
   });
   revalidatePath("/purchases");
@@ -86,6 +88,7 @@ export async function paySupplier(fd: FormData) {
   await tx(async (t) => {
     await t("INSERT INTO supplier_payments (purchase_id, method, amount, created_by) VALUES ($1,$2,$3,$4)", [id, str(fd, "method"), amount, user.id]);
     await t("UPDATE purchases SET paid = paid + $1 WHERE id=$2", [amount, id]);
+    await log(user.id, "Supplier paid", `${amount.toFixed(2)} by ${str(fd, "method")}`, `/purchases/${id}`, t);
   });
   revalidatePath(`/purchases/${id}`);
 }

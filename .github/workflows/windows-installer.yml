@@ -1,0 +1,28 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: "Brand folder in brands/ (e.g. default, zaitoon)"
+        required: true
+        default: default
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ github.event.inputs.brand || 'default' }}
+          path: release/*/*.exe
+          if-no-files-found: error

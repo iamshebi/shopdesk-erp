@@ -12,13 +12,13 @@ import { ShoppingCart, Wrench, Recycle } from "lucide-react";
 const D = `(s.date AT TIME ZONE 'Asia/Dubai')::date`;
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  const user = await requireUser("dashboard");
+  const user = await requireUser();
   const sp = await searchParams;
   const s = await getSettings();
   const today = todayDubai();
   const month = today.slice(0, 8) + "01";
-  const showMoney = can(user, "reports") || user.role === "cashier";
-  const showProfit = can(user, "reports");
+  const showMoney = can(user, "dashboard.money");
+  const showProfit = can(user, "dashboard.money") && can(user, "products.cost");
 
   const sum = (from: string, to: string) =>
     one<{ sales: number; profit: number; n: number }>(

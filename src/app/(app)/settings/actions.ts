@@ -1,14 +1,13 @@
 "use server";
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { q } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { saveSettings } from "@/lib/settings";
+import { log } from "@/lib/activity";
 import { str, numf } from "@/lib/util";
 
 export async function updateSettings(fd: FormData) {
-  await requireUser("settings");
+  const user = await requireUser("settings");
   await saveSettings({
     shop_name: str(fd, "shop_name") || "My Shop",
     shop_name_ar: str(fd, "shop_name_ar"),
@@ -28,39 +27,7 @@ export async function updateSettings(fd: FormData) {
     invoice_terms: str(fd, "invoice_terms"),
     repair_terms: str(fd, "repair_terms"),
   });
+  await log(user.id, "Shop settings changed", "", "/settings");
   revalidatePath("/", "layout");
-  redirect("/settings?saved=1");
-}
-
-export async function addUser(fd: FormData) {
-  await requireUser("settings");
-  const password = str(fd, "password");
-  if (password.length < 6) redirect("/settings?err=Password+must+be+6%2B+characters");
-  try {
-    await q("INSERT INTO users (name, username, password_hash, role) VALUES ($1, $2, $3, $4)", [
-      str(fd, "name"),
-      str(fd, "username").toLowerCase(),
-      await bcrypt.hash(password, 10),
-      str(fd, "role"),
-    ]);
-  } catch {
-    redirect("/settings?err=Username+already+taken");
-  }
-  revalidatePath("/settings");
-}
-
-export async function toggleUser(fd: FormData) {
-  const me = await requireUser("settings");
-  const id = Number(fd.get("id"));
-  if (id === me.id) return;
-  await q("UPDATE users SET active = NOT active WHERE id = $1", [id]);
-  revalidatePath("/settings");
-}
-
-export async function resetPassword(fd: FormData) {
-  await requireUser("settings");
-  const password = str(fd, "password");
-  if (password.length < 6) redirect("/settings?err=Password+must+be+6%2B+characters");
-  await q("UPDATE users SET password_hash = $1 WHERE id = $2", [await bcrypt.hash(password, 10), Number(fd.get("id"))]);
   redirect("/settings?saved=1");
 }

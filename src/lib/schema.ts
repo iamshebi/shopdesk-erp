@@ -1,3 +1,5 @@
+import { DEFAULT_ROLES } from "./permissions";
+
 // Database schema. Every statement is idempotent so it can run on every cold start.
 // To change the schema later, append new statements to MIGRATIONS (never edit old ones).
 
@@ -235,6 +237,37 @@ CREATE TABLE IF NOT EXISTS supplier_payments (
 );
 `;
 
+const sqlStr = (v: string) => `'${v.replace(/'/g, "''")}'`;
+
 export const MIGRATIONS: string[] = [
-  // Add future schema changes here, e.g. "ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months INTEGER DEFAULT 0;"
+  // Add future schema changes at the END of this list. Every statement must be safe to run again.
+
+  // 1. Admin-defined roles with permissions
+  `CREATE TABLE IF NOT EXISTS roles (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL UNIQUE,
+     permissions TEXT NOT NULL DEFAULT '[]',
+     locked BOOLEAN NOT NULL DEFAULT FALSE,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS role_id INTEGER REFERENCES roles(id);
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+   INSERT INTO roles (name, permissions, locked)
+     SELECT v.name, v.permissions, v.locked FROM (VALUES ${DEFAULT_ROLES.map(
+       (r) => `(${sqlStr(r.name)}, ${sqlStr(JSON.stringify(r.perms))}, ${r.locked ? "TRUE" : "FALSE"})`,
+     ).join(", ")}) AS v(name, permissions, locked)
+     WHERE NOT EXISTS (SELECT 1 FROM roles);
+   UPDATE users u SET role_id = r.id FROM roles r WHERE u.role_id IS NULL AND lower(r.name) = lower(u.role);
+   UPDATE users SET role_id = (SELECT id FROM roles WHERE locked ORDER BY id LIMIT 1) WHERE role_id IS NULL;`,
+
+  // 2. Activity log
+  `CREATE TABLE IF NOT EXISTS activity (
+     id SERIAL PRIMARY KEY,
+     user_id INTEGER REFERENCES users(id),
+     action TEXT NOT NULL,
+     details TEXT NOT NULL DEFAULT '',
+     ref TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS activity_created_idx ON activity (created_at DESC);`,
 ];

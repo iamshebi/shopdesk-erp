@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { q, one, tx, nextNumber } from "@/lib/db";
+import { log } from "@/lib/activity";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { createSale, SaleError } from "@/lib/sales";
@@ -27,6 +28,7 @@ export async function createRepair(fd: FormData) {
       ],
     );
     await t("INSERT INTO repair_logs (repair_id, status, note, user_id) VALUES ($1,'received',$2,$3)", [r.id, "Device received", user.id]);
+    await log(user.id, "Repair job created", `${number} · ${str(fd, "device")} · ${name}`, `/repairs/${r.id}`, t);
     return r.id;
   });
   revalidatePath("/repairs");
@@ -40,6 +42,8 @@ export async function updateRepairStatus(fd: FormData) {
   if (status === "delivered") redirect(`/repairs/${id}`);
   await q("UPDATE repairs SET status=$1, updated_at=now() WHERE id=$2 AND status <> 'delivered'", [status, id]);
   await q("INSERT INTO repair_logs (repair_id, status, note, user_id) VALUES ($1,$2,$3,$4)", [id, status, str(fd, "note"), user.id]);
+  const r = await one<{ number: string }>("SELECT number FROM repairs WHERE id=$1", [id]);
+  await log(user.id, "Repair status", `${r?.number} → ${status.replace("_", " ")}`, `/repairs/${id}`);
   revalidatePath(`/repairs/${id}`);
   revalidatePath("/repairs");
 }
@@ -57,7 +61,7 @@ export async function updateRepairDetails(fd: FormData) {
 }
 
 export async function deliverRepair(fd: FormData) {
-  const user = await requireUser("repairs");
+  const user = await requireUser("repairs.deliver");
   const s = await getSettings();
   const id = Number(fd.get("id"));
   const r = await one<any>("SELECT * FROM repairs WHERE id=$1", [id]);
@@ -79,6 +83,7 @@ export async function deliverRepair(fd: FormData) {
       });
       await t("UPDATE repairs SET status='delivered', final_charge=$1, sale_id=$2, delivered_at=now(), updated_at=now() WHERE id=$3", [charge, sid, id]);
       await t("INSERT INTO repair_logs (repair_id, status, note, user_id) VALUES ($1,'delivered',$2,$3)", [id, "Delivered to customer", user.id]);
+      await log(user.id, "Repair delivered", `${r.number} · ${charge.toFixed(2)}`, `/sales/${sid}`, t);
       return sid;
     });
   } catch (e) {

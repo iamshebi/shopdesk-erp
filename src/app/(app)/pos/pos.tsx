@@ -24,7 +24,9 @@ const n = (v: string | number) => {
 };
 const f2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function Pos({ vatRate, inclusive, currency, preset }: { vatRate: number; inclusive: boolean; currency: string; preset: ProductHit | null }) {
+export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
+  vatRate: number; inclusive: boolean; currency: string; preset: ProductHit | null; perms: { price: boolean; discount: boolean; credit: boolean };
+}) {
   const router = useRouter();
   const [lines, setLines] = useState<Line[]>([]);
   const [customer, setCustomer] = useState({ id: null as number | null, name: "", phone: "", trn: "", address: "" });
@@ -150,8 +152,8 @@ export default function Pos({ vatRate, inclusive, currency, preset }: { vatRate:
                     <button className="btn-ghost btn-sm px-2" onClick={() => upd(l.key, { qty: l.qty + 1 })} aria-label="More"><Plus size={14} /></button>
                   </div>
                 )}
-                <div className="w-24 shrink-0"><div className="text-[10px] uppercase text-slate-400">Price</div><input className="input h-8 text-right" inputMode="decimal" value={l.price} onChange={(e) => upd(l.key, { price: e.target.value })} /></div>
-                <div className="w-20 shrink-0"><div className="text-[10px] uppercase text-slate-400">Discount</div><input className="input h-8 text-right" inputMode="decimal" value={l.discount} placeholder="0" onChange={(e) => upd(l.key, { discount: e.target.value })} /></div>
+                <div className="w-24 shrink-0"><div className="text-[10px] uppercase text-slate-400">Price</div><input className="input h-8 text-right disabled:bg-slate-50 disabled:text-slate-500" inputMode="decimal" value={l.price} disabled={!perms.price} title={perms.price ? "" : "Your role can't change prices"} onChange={(e) => upd(l.key, { price: e.target.value })} /></div>
+                {perms.discount && <div className="w-20 shrink-0"><div className="text-[10px] uppercase text-slate-400">Discount</div><input className="input h-8 text-right" inputMode="decimal" value={l.discount} placeholder="0" onChange={(e) => upd(l.key, { discount: e.target.value })} /></div>}
                 <div className="ml-auto w-24 shrink-0 text-right font-semibold tabular-nums">{f2(lineTotal)}</div>
                 <button className="shrink-0 p-1 text-slate-400 hover:text-red-500" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} aria-label="Remove"><Trash2 size={16} /></button>
               </div>
@@ -206,7 +208,7 @@ export default function Pos({ vatRate, inclusive, currency, preset }: { vatRate:
             {pays.map((p, i) => (
               <div key={i} className="flex gap-2">
                 <select className="input w-36" value={p.method} onChange={(e) => setPays((ps) => ps.map((x, j) => (j === i ? { ...x, method: e.target.value } : x)))}>
-                  {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  {PAYMENT_METHODS.filter((m) => perms.credit || m.id !== "credit").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
                 <input className="input text-right" inputMode="decimal" placeholder={pays.length === 1 ? f2(totals.total) : "0.00"} value={p.amount}
                   onChange={(e) => setPays((ps) => ps.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} disabled={p.method === "credit"} />

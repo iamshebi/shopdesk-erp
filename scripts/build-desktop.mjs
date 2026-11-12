@@ -1,0 +1,74 @@
+// Builds the Windows desktop app for one brand.
+//   node scripts/build-desktop.mjs --brand zaitoon          -> prepares desktop-dist/ (server + app)
+//   node scripts/build-desktop.mjs --brand zaitoon --pack   -> also makes the installer in release/<brand>/
+// A brand is a folder in brands/ with brand.json and icon.png (512x512).
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+const args = process.argv.slice(2);
+const brandName = args[args.indexOf("--brand") + 1] && args.includes("--brand") ? args[args.indexOf("--brand") + 1] : "default";
+const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..");
+const brandDir = path.join(root, "brands", brandName);
+if (!fs.existsSync(path.join(brandDir, "brand.json"))) {
+  console.error(`No brands/${brandName}/brand.json`);
+  process.exit(1);
+}
+const brand = JSON.parse(fs.readFileSync(path.join(brandDir, "brand.json"), "utf8"));
+const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const electronVersion = JSON.parse(fs.readFileSync(path.join(root, "node_modules/electron/package.json"), "utf8")).version;
+const run = (cmd, env = {}) => execSync(cmd, { cwd: root, stdio: "inherit", env: { ...process.env, ...env } });
+const copy = (from, to) => fs.cpSync(from, to, { recursive: true, dereference: true });
+
+console.log(`\n▶ Building ${brand.productName} (${brandName})`);
+run("npx next build", { SHOPDESK_STANDALONE: "1", NEXT_TELEMETRY_DISABLED: "1" });
+
+const out = path.join(root, "desktop-dist");
+fs.rmSync(out, { recursive: true, force: true });
+const server = path.join(out, "server");
+copy(path.join(root, ".next/standalone"), server);
+copy(path.join(root, ".next/static"), path.join(server, ".next/static"));
+if (fs.existsSync(path.join(root, "public"))) copy(path.join(root, "public"), path.join(server, "public"));
+// PGlite loads its WebAssembly files at runtime; make sure the whole package is there.
+copy(path.join(root, "node_modules/@electric-sql/pglite"), path.join(server, "node_modules/@electric-sql/pglite"));
+fs.rmSync(path.join(server, ".data"), { recursive: true, force: true });
+// Image optimisation isn't used; drop the large native image library.
+for (const d of ["node_modules/sharp", "node_modules/@img"]) fs.rmSync(path.join(server, d), { recursive: true, force: true });
+fs.rmSync(path.join(server, ".env"), { force: true });
+
+const appDir = path.join(out, "app");
+fs.mkdirSync(appDir, { recursive: true });
+for (const f of ["main.cjs", "backup.cjs"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
+fs.copyFileSync(path.join(brandDir, "brand.json"), path.join(appDir, "brand.json"));
+fs.copyFileSync(path.join(brandDir, "icon.png"), path.join(appDir, "icon.png"));
+fs.writeFileSync(
+  path.join(appDir, "package.json"),
+  JSON.stringify({ name: brand.executableName.toLowerCase().replace(/[^a-z0-9-]/g, "-"), productName: brand.productName, version: brand.version || pkg.version, main: "main.cjs", description: brand.productName, author: brand.supportName || "" }, null, 2),
+);
+
+const config = {
+  appId: brand.appId,
+  productName: brand.productName,
+  executableName: brand.executableName,
+  electronVersion,
+  directories: { app: appDir, output: path.join(root, "release", brandName) },
+  extraResources: [{ from: server, to: "server" }],
+  asar: true,
+  win: { target: [{ target: "nsis", arch: ["x64"] }], icon: path.join(brandDir, "icon.png") },
+  nsis: {
+    oneClick: false,
+    perMachine: false,
+    allowToChangeInstallationDirectory: true,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: brand.productName,
+    artifactName: `${brand.executableName}-Setup-\${version}.\${ext}`,
+  },
+};
+fs.writeFileSync(path.join(out, "builder.json"), JSON.stringify(config, null, 2));
+console.log(`✔ Prepared desktop-dist for ${brand.productName}`);
+
+if (args.includes("--pack")) {
+  run(`npx electron-builder --win --config "${path.join(out, "builder.json")}" --publish never`);
+  console.log(`✔ Installer in release/${brandName}/`);
+}

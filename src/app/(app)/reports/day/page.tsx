@@ -9,7 +9,7 @@ import PrintButton from "@/components/print-button";
 const L = (col: string) => `(${col} AT TIME ZONE 'Asia/Dubai')::date = $1`;
 
 export default async function DayClose({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireUser("reports");
+  await requireUser("reports.day");
   const sp = await searchParams;
   const s = await getSettings();
   const day = sp.day || todayDubai();

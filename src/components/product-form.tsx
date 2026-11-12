@@ -8,6 +8,7 @@ export default function ProductForm(props: {
   categories: string[];
   brands: string[];
   isNew?: boolean;
+  showCost?: boolean;
 }) {
   const p = props.product ?? {};
   const [serial, setSerial] = useState<boolean>(p.track_serial ?? false);
@@ -38,10 +39,12 @@ export default function ProductForm(props: {
           <label className="label">Barcode</label>
           <input name="barcode" defaultValue={p.barcode} className="input" />
         </div>
-        <div>
-          <label className="label">Cost price (excl. VAT)</label>
-          <input name="cost" defaultValue={p.cost ?? ""} className="input" inputMode="decimal" />
-        </div>
+        {props.showCost !== false ? (
+          <div>
+            <label className="label">Cost price (excl. VAT)</label>
+            <input name="cost" defaultValue={p.cost ?? ""} className="input" inputMode="decimal" />
+          </div>
+        ) : null}
         <div>
           <label className="label">Selling price</label>
           <input name="price" defaultValue={p.price ?? ""} className="input" inputMode="decimal" required />

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { q, one } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, can } from "@/lib/auth";
 import { STOCK_SQL } from "@/lib/stock";
 import { fmtDate, num } from "@/lib/util";
 import { PageHeader, Badge, Empty } from "@/components/ui";
@@ -12,7 +12,7 @@ import { updateProduct, toggleProduct, adjustStock, addUnits, writeOffUnit } fro
 const UNIT_TONE: Record<string, string> = { in_stock: "green", sold: "slate", written_off: "red", returned: "amber" };
 
 export default async function ProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
-  const user = await requireUser("products");
+  const user = await requireUser("products.view");
   const { id } = await params;
   const sp = await searchParams;
   const p = await one<any>(`SELECT p.*, ${STOCK_SQL} AS stock FROM products p WHERE p.id=$1`, [Number(id)]);
@@ -32,15 +32,17 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
      FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id=$1`,
     [p.id],
   );
-  const canAdjust = user.role !== "cashier";
+  const canAdjust = can(user, "stock.adjust");
+  const showCost = can(user, "products.cost");
+  const canEdit = can(user, "products.edit");
   return (
     <div className="max-w-5xl">
       <PageHeader title={p.name} subtitle={`${p.brand || "No brand"} · ${p.category || "Uncategorised"}${p.active ? "" : " · archived"}`}>
-        <Link href={`/pos?add=${p.id}`} className="btn-primary">Sell</Link>
-        <form action={toggleProduct}>
+        {can(user, "pos") && <Link href={`/pos?add=${p.id}`} className="btn-primary">Sell</Link>}
+        {canEdit && <form action={toggleProduct}>
           <input type="hidden" name="id" value={p.id} />
           <Submit className="btn-ghost">{p.active ? "Archive" : "Restore"}</Submit>
-        </form>
+        </form>}
       </PageHeader>
       {sp.saved && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">Saved.</div>}
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
@@ -50,7 +52,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         <div className="card p-5"><div className="text-xs text-slate-500">Revenue (all time)</div><div className="mt-1 text-2xl font-semibold">{num(sold?.revenue)}</div></div>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <ProductForm action={updateProduct} product={p} categories={cats.map((c) => c.v)} brands={brands.map((b) => b.v)} />
+        {canEdit ? (
+          <ProductForm action={updateProduct} product={p} categories={cats.map((c) => c.v)} brands={brands.map((b) => b.v)} showCost={showCost} />
+        ) : (
+          <div className="card grid h-fit gap-4 p-6 text-sm sm:grid-cols-2">
+            <div><div className="label">Selling price</div><div className="text-lg font-semibold">{num(p.price)}</div></div>
+            {showCost && <div><div className="label">Cost</div><div className="text-lg">{num(p.cost)}</div></div>}
+            <div><div className="label">SKU</div>{p.sku || "—"}</div>
+            <div><div className="label">Barcode</div>{p.barcode || "—"}</div>
+          </div>
+        )}
         <div className="space-y-6">
           {!p.track_serial && !p.is_service && canAdjust && (
             <form action={adjustStock} className="card space-y-3 p-5">
@@ -82,7 +93,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             <Empty>No units yet.</Empty>
           ) : (
             <table className="tbl">
-              <thead><tr><th>IMEI / Serial</th><th>Status</th><th>Source</th><th className="text-right">Cost</th><th>Added</th><th></th></tr></thead>
+              <thead><tr><th>IMEI / Serial</th><th>Status</th><th>Source</th>{showCost && <th className="text-right">Cost</th>}<th>Added</th><th></th></tr></thead>
               <tbody>
                 {units.map((u) => (
                   <tr key={u.id}>
@@ -92,7 +103,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                       {u.margin_scheme && <span className="ml-1"><Badge tone="violet">margin VAT</Badge></span>}
                     </td>
                     <td className="text-slate-500 capitalize">{u.source}{u.sale_no && <> · <Link href={`/sales/${u.sale_id2}`} className="link">{u.sale_no}</Link></>}</td>
-                    <td className="text-right tabular-nums">{num(u.cost)}</td>
+                    {showCost && <td className="text-right tabular-nums">{num(u.cost)}</td>}
                     <td className="text-slate-500">{fmtDate(u.created_at)}</td>
                     <td className="text-right">
                       {u.status === "in_stock" && canAdjust && (

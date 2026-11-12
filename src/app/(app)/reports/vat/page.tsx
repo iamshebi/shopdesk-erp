@@ -17,7 +17,7 @@ function quarter() {
 }
 
 export default async function VatReport({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireUser("reports");
+  await requireUser("reports.vat");
   const sp = await searchParams;
   const s = await getSettings();
   const qd = quarter();

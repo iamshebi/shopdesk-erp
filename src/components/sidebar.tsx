@@ -24,11 +24,17 @@ const NAV = [
   { area: "settings", href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export default function Sidebar(props: { shopName: string; logo: string; userName: string; role: string; areas: string[] }) {
+export default function Sidebar(props: { shopName: string; logo: string; userName: string; role: string; areas: string[]; reportsHref?: string; settingsHref?: string }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const items = NAV.filter((n) => props.areas.includes(n.area));
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const items = NAV.filter((n) => props.areas.includes(n.area)).map((n) =>
+    n.area === "reports" && props.reportsHref ? { ...n, href: props.reportsHref } : n.area === "settings" && props.settingsHref ? { ...n, href: props.settingsHref } : n,
+  );
+  const active = (href: string) => {
+    if (href === "/") return path === "/";
+    const base = "/" + href.split("/")[1];
+    return path.startsWith(base);
+  };
 
   const content = (
     <div className="flex h-full flex-col">

@@ -10,6 +10,7 @@ type Row = Record<string, any>;
 export type Exec = <T = Row>(text: string, params?: unknown[]) => Promise<T[]>;
 
 interface Driver {
+  close(): Promise<void>;
   query: Exec;
   transaction<T>(fn: (q: Exec) => Promise<T>): Promise<T>;
   setup(sqls: string[]): Promise<void>;
@@ -31,6 +32,7 @@ async function makePg(url: string): Promise<Driver> {
     ssl: local ? undefined : { rejectUnauthorized: false },
   });
   return {
+    close: () => pool.end(),
     query: async (text, params = []) => (await pool.query(text, params as any[])).rows,
     setup: async (sqls) => {
       const client = await pool.connect();
@@ -72,6 +74,7 @@ async function makePglite(): Promise<Driver> {
     },
   });
   return {
+    close: () => db.close(),
     query: async (text, params = []) => (await db.query(text, params as any[])).rows as any[],
     setup: async (sqls) => {
       for (const s of sqls) await db.exec(s);
@@ -117,4 +120,12 @@ export async function nextNumber(t: Exec, name: string, prefix: string): Promise
     [name],
   );
   return `${prefix}${String(rows[0].value).padStart(6, "0")}`;
+}
+
+/** Flush and close the database (desktop app calls this before quitting). */
+export async function closeDb() {
+  if (!g.__shopdb) return;
+  const d = await g.__shopdb;
+  g.__shopdb = undefined;
+  await d.close();
 }

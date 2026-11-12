@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { q } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, can } from "@/lib/auth";
 import { OUTSTANDING_SQL } from "@/lib/sales";
 import { fmtDate, num, todayDubai } from "@/lib/util";
 import { PageHeader, Badge, Empty } from "@/components/ui";
 import { Plus } from "lucide-react";
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireUser("sales");
+  const user = await requireUser("sales.view");
   const sp = await searchParams;
   const from = sp.from || new Date(Date.now() - 29 * 864e5).toLocaleDateString("en-CA", { timeZone: "Asia/Dubai" });
   const to = sp.to || todayDubai();
@@ -17,6 +17,10 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     params.push(`%${sp.q}%`);
     const i = params.length;
     where.push(`(s.number ILIKE $${i} OR s.customer_name ILIKE $${i} OR s.customer_phone ILIKE $${i} OR EXISTS (SELECT 1 FROM sale_items x WHERE x.sale_id=s.id AND (x.imei ILIKE $${i} OR x.description ILIKE $${i})))`);
+  }
+  if (!can(user, "sales.all")) {
+    params.push(user.id);
+    where.push(`s.created_by = $${params.length}`);
   }
   if (sp.due) where.push(`s.type='invoice' AND ${OUTSTANDING_SQL} > 0.004`);
   const rows = await q<any>(
@@ -29,8 +33,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const net = inv.reduce((a, r) => a + r.total, 0) - cn.reduce((a, r) => a + r.total, 0);
   return (
     <div>
-      <PageHeader title="Invoices" subtitle={`${inv.length} invoices · ${cn.length} returns · net ${num(net)}`}>
-        <Link href="/pos" className="btn-primary"><Plus size={16} /> New sale</Link>
+      <PageHeader title={can(user, "sales.all") ? "Invoices" : "My invoices"} subtitle={`${inv.length} invoices · ${cn.length} returns · net ${num(net)}`}>
+        {can(user, "pos") && <Link href="/pos" className="btn-primary"><Plus size={16} /> New sale</Link>}
       </PageHeader>
       <form className="mb-4 flex flex-wrap gap-2">
         <input name="q" defaultValue={sp.q} placeholder="Invoice no., customer, phone, IMEI…" className="input max-w-xs" />

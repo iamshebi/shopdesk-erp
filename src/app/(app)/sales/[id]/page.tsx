@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { q, one } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, can } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { OUTSTANDING_SQL } from "@/lib/sales";
 import { fmtDate, num, methodLabel, waLink, PAYMENT_METHODS } from "@/lib/util";
@@ -11,12 +11,13 @@ import { Printer, MessageCircle, Plus } from "lucide-react";
 import { receivePayment, returnItems } from "../actions";
 
 export default async function SalePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
-  const user = await requireUser("sales");
+  const user = await requireUser("sales.view");
   const { id } = await params;
   const sp = await searchParams;
   const s = await getSettings();
   const sale = await one<any>(`SELECT s.*, ${OUTSTANDING_SQL} outstanding, u.name cashier, o.number ref_number FROM sales s LEFT JOIN users u ON u.id=s.created_by LEFT JOIN sales o ON o.id = s.ref_sale_id WHERE s.id=$1`, [Number(id)]);
   if (!sale) notFound();
+  if (!can(user, "sales.all") && sale.created_by !== user.id) redirect("/sales?denied=1");
   const items = await q<any>(
     `SELECT si.*, si.qty - COALESCE((SELECT sum(r.qty) FROM sale_items r JOIN sales c ON c.id=r.sale_id WHERE c.type='credit_note' AND r.ref_item_id = si.id),0)::int returnable
      FROM sale_items si WHERE si.sale_id=$1 ORDER BY si.id`,
@@ -55,7 +56,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         <div className="card p-5">
           <div className="text-xs text-slate-500">{isCN ? "Refunded" : "Status"}</div>
           <div className="mt-1">{isCN ? <span className="text-2xl font-semibold tabular-nums">{num(sale.paid)}</span> : sale.outstanding > 0.004 ? <Badge tone="amber">Due {num(sale.outstanding)}</Badge> : <Badge tone="green">Paid in full</Badge>}</div>
-          {user.role !== "technician" && !isCN && <div className="mt-1 text-xs text-slate-400">Profit {num(sale.subtotal - sale.cost)}</div>}
+          {can(user, "products.cost") && !isCN && <div className="mt-1 text-xs text-slate-400">Profit {num(sale.subtotal - sale.cost)}</div>}
         </div>
       </div>
 
@@ -95,7 +96,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
           )}
           {sale.notes && <p className="mt-3 text-sm text-slate-500">Note: {sale.notes}</p>}
         </div>
-        {!isCN && sale.outstanding > 0.004 && (
+        {!isCN && sale.outstanding > 0.004 && can(user, "sales.payments") && (
           <form action={receivePayment} className="card space-y-3 p-5">
             <h3 className="font-semibold">Receive payment</h3>
             <input type="hidden" name="id" value={sale.id} />
@@ -109,7 +110,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         )}
       </div>
 
-      {anyReturnable && user.role !== "technician" && (
+      {anyReturnable && can(user, "sales.returns") && (
         <details className="card mt-6 p-5">
           <summary className="cursor-pointer font-semibold">Return / refund items</summary>
           <form action={returnItems} className="mt-4 space-y-3">
