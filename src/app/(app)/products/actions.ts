@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { moveQty, moveUnit, MOVE_TYPES } from "@/lib/inventory";
 import { redirect } from "next/navigation";
 import { q, one, tx } from "@/lib/db";
 import { internalEan13 } from "@/lib/barcode";
@@ -51,12 +52,17 @@ export async function createProduct(fd: FormData) {
   const id = await tx(async (t) => {
     const [p] = await t<{ id: number }>(
       `INSERT INTO products (${COLS.join(", ")}, stock_qty) VALUES (${COLS.map((_, i) => `$${i + 1}`).join(", ")}, $${COLS.length + 1}) RETURNING id`,
-      [...COLS.map((c) => d[c]), d.track_serial || d.is_service ? 0 : opening],
+      [...COLS.map((c) => d[c]), 0],
     );
+    const wh = Number(str(fd, "warehouse_id")) || undefined;
+    if (!d.track_serial && !d.is_service && opening) await moveQty(t, { productId: p.id, qty: opening, type: "opening", userId: user.id, warehouseId: wh });
     if (!d.sku) await t("UPDATE products SET sku = $2 WHERE id=$1", [p.id, `P${String(p.id).padStart(5, "0")}`]);
     if (d.track_serial) {
       const imeis = str(fd, "opening_imeis").split(/[\s,]+/).filter(Boolean);
-      for (const imei of imeis) await t("INSERT INTO units (product_id, imei, cost, source) VALUES ($1, $2, $3, 'opening')", [p.id, imei, d.cost]);
+      for (const imei of imeis) {
+        const [u] = await t<{ id: number }>("INSERT INTO units (product_id, imei, cost, source) VALUES ($1, $2, $3, 'opening') RETURNING id", [p.id, imei, d.cost]);
+        await moveUnit(t, { unitId: u.id, productId: p.id, qty: 1, type: "opening", userId: user.id, warehouseId: wh });
+      }
     }
     await t("INSERT INTO product_history (product_id, user_id, field, new_value, source) VALUES ($1,$2,'Created',$3,'create')", [p.id, user.id, d.name]);
     return p.id;
@@ -176,7 +182,12 @@ export async function adjustStock(fd: FormData) {
   const user = await requireUser("stock.adjust");
   const id = Number(fd.get("id"));
   const delta = Math.round(numf(fd, "delta"));
-  const r = await one<any>("UPDATE products SET stock_qty = stock_qty + $1, updated_at=now() WHERE id=$2 RETURNING name, stock_qty", [delta, id]);
+  const reason = str(fd, "reason") || "adjust";
+  const r = await tx(async (t) => {
+    await moveQty(t, { productId: id, qty: delta, type: MOVE_TYPES[reason] ? reason : "adjust", reason: str(fd, "note"), userId: user.id, warehouseId: Number(str(fd, "warehouse_id")) || undefined });
+    const [row] = await t<any>("SELECT name, stock_qty FROM products WHERE id=$1", [id]);
+    return row;
+  });
   if (r) await q("INSERT INTO product_history (product_id, user_id, field, old_value, new_value, source) VALUES ($1,$2,'Stock',$3,$4,'adjust')", [id, user.id, String(r.stock_qty - delta), String(r.stock_qty)]);
   if (r) await log(user.id, "Stock adjusted", `${r.name}: ${delta > 0 ? "+" : ""}${delta} (now ${r.stock_qty})`, `/products/${id}`);
   revalidatePath(`/products/${id}`);
@@ -195,7 +206,10 @@ export async function addUnits(fd: FormData) {
       dupes.push(imei);
       continue;
     }
-    await q("INSERT INTO units (product_id, imei, cost, source) VALUES ($1,$2,$3,'opening')", [id, imei, cost]);
+    await tx(async (t) => {
+      const [u] = await t<{ id: number }>("INSERT INTO units (product_id, imei, cost, source) VALUES ($1,$2,$3,'opening') RETURNING id", [id, imei, cost]);
+      await moveUnit(t, { unitId: u.id, productId: id, qty: 1, type: "opening", userId: user.id, warehouseId: Number(str(fd, "warehouse_id")) || undefined });
+    });
   }
   await log(user.id, "IMEIs added to stock", `${imeis.length - dupes.length} unit(s)`, `/products/${id}`);
   revalidatePath(`/products/${id}`);
@@ -210,6 +224,7 @@ export async function writeOffUnit(fd: FormData) {
     str(fd, "reason") || "Written off",
   ]);
   if (u) {
+    await tx((t) => moveUnit(t, { unitId, productId: u.product_id, qty: -1, type: "writeoff", reason: str(fd, "reason"), userId: user.id }));
     await log(user.id, "Unit written off", `${str(fd, "reason") || "Written off"} (unit #${unitId})`, `/products/${u.product_id}`);
     revalidatePath(`/products/${u.product_id}`);
   }
@@ -308,9 +323,12 @@ export async function importProducts(_: unknown, fd: FormData) {
       const serial = /^(y|yes|true|1)$/i.test(get(r, col.serial));
       await t(
         `INSERT INTO products (name, brand, category, sku, barcode, cost, price, stock_qty, track_serial)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [name, get(r, col.brand), get(r, col.category), get(r, col.sku), get(r, col.barcode), canCost ? n(get(r, col.cost)) : 0, n(get(r, col.price)), serial ? 0 : Math.round(n(get(r, col.qty))), serial],
-      );
+         VALUES ($1,$2,$3,$4,$5,$6,$7,0,$8) RETURNING id`,
+        [name, get(r, col.brand), get(r, col.category), get(r, col.sku), get(r, col.barcode), canCost ? n(get(r, col.cost)) : 0, n(get(r, col.price)), serial],
+      ).then(async ([np]: any[]) => {
+        const qty = serial ? 0 : Math.round(n(get(r, col.qty)));
+        if (qty) await moveQty(t, { productId: np.id, qty, type: "import", userId: user.id });
+      });
       count++;
     }
   });

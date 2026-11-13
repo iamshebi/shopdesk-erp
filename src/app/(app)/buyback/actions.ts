@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { moveUnit } from "@/lib/inventory";
 import { tx, nextNumber, q } from "@/lib/db";
 import { log } from "@/lib/activity";
 import { requireUser } from "@/lib/auth";
@@ -39,10 +40,11 @@ export async function createBuyback(_: unknown, fd: FormData): Promise<{ error?:
       [number, customerId, str(fd, "seller_name"), phone, str(fd, "id_type"), str(fd, "id_number"), str(fd, "nationality"), productId, imei, str(fd, "condition"), price, str(fd, "payment_method"), str(fd, "notes"), user.id],
     );
     const sell = numf(fd, "sell_price");
-    await t(
-      "INSERT INTO units (product_id, imei, cost, price, source, margin_scheme, buyback_id, notes) VALUES ($1,$2,$3,$4,'buyback',$5,$6,$7)",
+    const [u] = await t<{ id: number }>(
+      "INSERT INTO units (product_id, imei, cost, price, source, margin_scheme, buyback_id, notes) VALUES ($1,$2,$3,$4,'buyback',$5,$6,$7) RETURNING id",
       [productId, imei, price, sell > 0 ? sell : null, fd.get("margin_scheme") === "on", b.id, str(fd, "condition")],
     );
+    await moveUnit(t, { unitId: u.id, productId, qty: 1, type: "buyback", ref: number, userId: user.id });
     await log(user.id, "Used device bought", `${number} · IMEI ${imei} · ${price.toFixed(2)} · ${str(fd, "seller_name")}`, `/print/buyback/${b.id}`, t);
     return b.id;
   });

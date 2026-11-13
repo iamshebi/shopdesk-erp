@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard,
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse,
 } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
@@ -26,6 +26,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
   {
     id: "inventory", label: "Inventory", items: [
       { area: "products", href: "/products", label: "Products & stock", icon: Package, key: "P" },
+      { area: "products", href: "/inventory", label: "Warehouses & moves", icon: Warehouse },
       { area: "imei", href: "/imei", label: "IMEI lookup", icon: ScanLine },
       { area: "purchases", href: "/purchases", label: "Purchases", icon: Truck },
       { area: "suppliers", href: "/suppliers", label: "Suppliers", icon: Building2 },

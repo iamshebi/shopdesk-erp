@@ -7,6 +7,7 @@ import { verifyTotp, decryptField } from "@/lib/totp";
 import { saveSettings } from "@/lib/settings";
 import { str } from "@/lib/util";
 import { log } from "@/lib/activity";
+import { loadDemoData } from "@/lib/demo-data";
 
 async function recordLogin(userId: number | null, username: string, success: boolean, reason = "") {
   const { ip, ua } = await clientInfo();
@@ -104,6 +105,10 @@ export async function setupShop(_: unknown, fd: FormData) {
     [name, username, hash],
   );
   await log(rows[0].id, "Shop created", shop_name);
+  if (fd.get("demo") === "on") {
+    const n = await loadDemoData(rows[0].id);
+    await log(rows[0].id, "Demo data loaded", `${n} sample records`);
+  }
   await startSession(rows[0].id);
   redirect("/settings?welcome=1");
 }

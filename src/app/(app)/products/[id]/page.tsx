@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { q, one } from "@/lib/db";
 import { requireUser, can } from "@/lib/auth";
 import { STOCK_SQL } from "@/lib/stock";
+import { WH_STOCK_SQL } from "@/lib/inventory";
 import { fmtDate, num } from "@/lib/util";
 import { PageHeader, Badge, Empty } from "@/components/ui";
 import ProductForm from "@/components/product-form";
@@ -35,6 +36,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
      FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id=$1`,
     [p.id],
   );
+  const byWh = p.is_service ? [] : await q<any>(`SELECT w.id, w.name, w.is_default, ${WH_STOCK_SQL("p", "w.id")} AS qty FROM warehouses w, products p WHERE p.id=$1 AND w.active ORDER BY w.is_default DESC, w.name`, [p.id]);
   const history = await q<any>("SELECT h.*, u.name FROM product_history h LEFT JOIN users u ON u.id=h.user_id WHERE h.product_id=$1 ORDER BY h.id DESC LIMIT 100", [p.id]);
   const canAdjust = can(user, "stock.adjust");
   const showCost = can(user, "products.cost");
@@ -72,11 +74,23 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </div>
         )}
         <div className="space-y-6">
+          {byWh.length > 0 && (
+            <div className="card p-5">
+              <div className="mb-2 flex items-center justify-between"><h3 className="font-semibold">Stock by warehouse</h3><Link href={`/inventory/moves?product=${p.id}&from=2000-01-01`} className="text-xs text-accent hover:underline">Movements</Link></div>
+              <ul className="space-y-1.5 text-sm">
+                {byWh.map((w) => <li key={w.id} className="flex justify-between"><span>{w.name}{w.is_default && <span className="ml-1 text-xs text-slate-400">(default)</span>}</span><span className="tabular-nums font-medium">{w.qty}</span></li>)}
+              </ul>
+            </div>
+          )}
           {!p.track_serial && !p.is_service && canAdjust && (
             <form action={adjustStock} className="card space-y-3 p-5">
               <h3 className="font-semibold">Adjust stock</h3>
               <p className="text-xs text-slate-500">Use + to add (e.g. stock count found more) or − to remove (damaged, lost). Purchases add stock automatically.</p>
               <input type="hidden" name="id" value={p.id} />
+              {byWh.length > 1 && <select name="warehouse_id" className="input">{byWh.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>}
+              <select name="reason" className="input" defaultValue="adjust">
+                <option value="adjust">Correction</option><option value="damaged">Damaged</option><option value="lost">Lost / stolen</option><option value="found">Found</option><option value="supplier_return">Returned to supplier</option>
+              </select>
               <div className="flex gap-2">
                 <input name="delta" className="input" placeholder="+5 or -2" inputMode="numeric" required />
                 <Submit className="btn-dark">Apply</Submit>

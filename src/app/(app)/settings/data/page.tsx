@@ -5,6 +5,8 @@ import SettingsTabs from "@/components/settings-tabs";
 import ImportForm from "../../products/import/form";
 import RestoreForm from "./restore-form";
 import ResetForm from "./reset-form";
+import Submit from "@/components/submit";
+import { loadDemo } from "./actions";
 import { getSettings } from "@/lib/settings";
 import { Download, FileSpreadsheet, FileText, DatabaseBackup } from "lucide-react";
 
@@ -67,6 +69,12 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
           <p className="mb-4 mt-1 text-sm text-slate-500">Replaces <b>all</b> current data with the backup file. Use it when moving to a new computer or recovering. Owner only.</p>
           {owner ? <RestoreForm /> : <p className="text-sm text-slate-400">Ask the owner to do this.</p>}
         </div>
+      </section>
+
+      {sp.ok && <div className="card mt-6 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
+      <section className="card mt-6 flex flex-wrap items-center justify-between gap-3 p-6">
+        <div><h2 className="font-semibold">Sample data</h2><p className="mt-1 text-sm text-slate-500">Adds 5 fictional products, 3 customers and 2 suppliers so you can try sales, stock and reports.</p></div>
+        <form action={loadDemo}><Submit className="btn-ghost">Load sample data</Submit></form>
       </section>
 
       {owner && (

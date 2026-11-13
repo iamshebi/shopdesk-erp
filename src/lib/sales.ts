@@ -1,4 +1,5 @@
 import "server-only";
+import { moveQty, moveUnit } from "./inventory";
 import { Exec, nextNumber } from "./db";
 import { ShopSettings } from "./settings";
 import { lineVat, r2 } from "./util";
@@ -139,8 +140,9 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
     );
     if (c.unitId) {
       await t("UPDATE units SET status='sold', sale_id=$1 WHERE id=$2", [sale.id, c.unitId]);
+      await moveUnit(t, { unitId: c.unitId, productId: c.product_id!, qty: -1, type: "sale", ref: number, userId: input.userId });
     } else if (c.product_id) {
-      await t("UPDATE products SET stock_qty = stock_qty - $1 WHERE id=$2 AND NOT is_service AND NOT track_serial", [c.qty, c.product_id]);
+      await moveQty(t, { productId: c.product_id, qty: -c.qty, type: "sale", ref: number, userId: input.userId });
     }
   }
   for (const p of pays) {
@@ -204,8 +206,9 @@ export async function createReturn(
     );
     if (p.it.unit_id) {
       await t("UPDATE units SET status='in_stock', sale_id=NULL, notes='Returned on ' || $2 WHERE id=$1", [p.it.unit_id, number]);
+      await moveUnit(t, { unitId: p.it.unit_id, productId: p.it.product_id, qty: 1, type: "return", ref: number, userId });
     } else if (p.it.product_id && !p.it.is_service) {
-      await t("UPDATE products SET stock_qty = stock_qty + $1 WHERE id=$2", [p.qty, p.it.product_id]);
+      await moveQty(t, { productId: p.it.product_id, qty: p.qty, type: "return", ref: number, userId });
     }
   }
   if (refunded > 0) {

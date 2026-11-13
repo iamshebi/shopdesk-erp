@@ -48,6 +48,10 @@ export default function SetupForm() {
         </div>
       </div>
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <label className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-sm">
+        <input type="checkbox" name="demo" className="mt-0.5" />
+        <span>Load sample data to try the system<span className="block text-xs text-slate-400">5 products, 3 customers, 2 suppliers (fictional). Remove later with Start fresh.</span></span>
+      </label>
       <button className="btn-primary w-full" disabled={pending}>
         {pending ? "Setting up…" : "Create shop"}
       </button>

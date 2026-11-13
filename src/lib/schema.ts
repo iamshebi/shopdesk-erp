@@ -322,4 +322,77 @@ export const MIGRATIONS: string[] = [
      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );
    CREATE INDEX IF NOT EXISTS product_history_idx ON product_history (product_id, created_at DESC);`,
+
+  // 5. Warehouses: stock per location, transfers, adjustments, stock counts, movement history
+  `CREATE TABLE IF NOT EXISTS warehouses (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     code TEXT NOT NULL DEFAULT '',
+     address TEXT NOT NULL DEFAULT '',
+     is_default BOOLEAN NOT NULL DEFAULT FALSE,
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   INSERT INTO warehouses (name, code, is_default) SELECT 'Main shop', 'MAIN', TRUE WHERE NOT EXISTS (SELECT 1 FROM warehouses);
+   CREATE TABLE IF NOT EXISTS product_stock (
+     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+     warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+     qty INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (product_id, warehouse_id)
+   );
+   ALTER TABLE units ADD COLUMN IF NOT EXISTS warehouse_id INTEGER REFERENCES warehouses(id);
+   CREATE TABLE IF NOT EXISTS stock_moves (
+     id SERIAL PRIMARY KEY,
+     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+     warehouse_id INTEGER REFERENCES warehouses(id),
+     unit_id INTEGER REFERENCES units(id) ON DELETE SET NULL,
+     qty INTEGER NOT NULL,
+     type TEXT NOT NULL,
+     reason TEXT NOT NULL DEFAULT '',
+     ref TEXT NOT NULL DEFAULT '',
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS stock_moves_product_idx ON stock_moves (product_id, created_at DESC);
+   CREATE INDEX IF NOT EXISTS stock_moves_created_idx ON stock_moves (created_at DESC);
+   CREATE TABLE IF NOT EXISTS stock_transfers (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     from_warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+     to_warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+     notes TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS stock_transfer_items (
+     id SERIAL PRIMARY KEY,
+     transfer_id INTEGER NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+     product_id INTEGER NOT NULL REFERENCES products(id),
+     unit_id INTEGER REFERENCES units(id),
+     qty INTEGER NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS stock_counts (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+     category TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL DEFAULT 'open',
+     notes TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     applied_at TIMESTAMPTZ
+   );
+   CREATE TABLE IF NOT EXISTS stock_count_items (
+     id SERIAL PRIMARY KEY,
+     count_id INTEGER NOT NULL REFERENCES stock_counts(id) ON DELETE CASCADE,
+     product_id INTEGER NOT NULL REFERENCES products(id),
+     expected INTEGER NOT NULL,
+     counted INTEGER,
+     cost NUMERIC(12,2) NOT NULL DEFAULT 0
+   );
+   INSERT INTO product_stock (product_id, warehouse_id, qty)
+     SELECT p.id, (SELECT id FROM warehouses WHERE is_default ORDER BY id LIMIT 1), p.stock_qty
+     FROM products p WHERE NOT p.track_serial AND NOT p.is_service AND p.stock_qty <> 0
+       AND NOT EXISTS (SELECT 1 FROM product_stock);
+   UPDATE units SET warehouse_id = (SELECT id FROM warehouses WHERE is_default ORDER BY id LIMIT 1) WHERE warehouse_id IS NULL;`,
 ];

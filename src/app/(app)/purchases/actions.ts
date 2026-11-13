@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { moveQty, moveUnit, defaultWarehouseId } from "@/lib/inventory";
 import { redirect } from "next/navigation";
 import { tx, nextNumber, q, one } from "@/lib/db";
 import { log } from "@/lib/activity";
@@ -56,16 +57,18 @@ export async function createPurchase(_: unknown, fd: FormData) {
     if (paid > 0) {
       await t("INSERT INTO supplier_payments (purchase_id, method, amount, created_by) VALUES ($1,$2,$3,$4)", [p.id, str(fd, "method") || "cash", paid, user.id]);
     }
+    const wh = Number(str(fd, "warehouse_id")) || (await defaultWarehouseId(t));
     for (const l of computed) {
       await t("INSERT INTO purchase_items (purchase_id, product_id, qty, unit_cost, vat, total) VALUES ($1,$2,$3,$4,$5,$6)", [
         p.id, l.product_id, l.qty, l.unit_cost, l.v, r2(l.net + l.v),
       ]);
       if (l.track_serial) {
         for (const imei of l.imeis) {
-          await t("INSERT INTO units (product_id, imei, cost, source, purchase_id) VALUES ($1,$2,$3,'purchase',$4)", [l.product_id, imei, l.unit_cost, p.id]);
+          const [u] = await t<{ id: number }>("INSERT INTO units (product_id, imei, cost, source, purchase_id, warehouse_id) VALUES ($1,$2,$3,'purchase',$4,$5) RETURNING id", [l.product_id, imei, l.unit_cost, p.id, wh]);
+          await moveUnit(t, { unitId: u.id, productId: l.product_id, qty: 1, type: "purchase", ref: number, userId: user.id, warehouseId: wh });
         }
       } else {
-        await t("UPDATE products SET stock_qty = stock_qty + $1 WHERE id=$2 AND NOT is_service", [l.qty, l.product_id]);
+        await moveQty(t, { productId: l.product_id, qty: l.qty, type: "purchase", ref: number, userId: user.id, warehouseId: wh });
       }
       // keep last purchase cost on the product
       await t("UPDATE products SET cost = $1 WHERE id=$2", [l.unit_cost, l.product_id]);

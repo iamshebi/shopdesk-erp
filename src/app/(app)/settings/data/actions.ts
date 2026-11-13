@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { restoreBackup, resetAllData } from "@/lib/backup";
 import { redirect } from "next/navigation";
 import { getSettings } from "@/lib/settings";
+import { loadDemoData } from "@/lib/demo-data";
 import { log } from "@/lib/activity";
 import { str } from "@/lib/util";
 
@@ -40,4 +41,12 @@ export async function resetEverything(_: unknown, fd: FormData): Promise<{ error
   await resetAllData();
   revalidatePath("/", "layout");
   redirect("/setup");
+}
+
+export async function loadDemo() {
+  const me = await requireUser("data");
+  const n = await loadDemoData(me.id);
+  await log(me.id, "Demo data loaded", `${n} sample records`, "/settings/data");
+  revalidatePath("/", "layout");
+  redirect(`/settings/data?ok=${encodeURIComponent(n ? `Added ${n} sample records` : "Sample data is already loaded")}`);
 }

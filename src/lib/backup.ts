@@ -3,6 +3,7 @@ import { q, tx } from "./db";
 import { BACKUP_TABLES } from "./datasets";
 import { decryptField } from "./totp";
 import { DEFAULT_ROLES } from "./permissions";
+import { defaultWarehouseId } from "./inventory";
 
 export async function makeBackup() {
   const tables: Record<string, unknown[]> = {};
@@ -29,6 +30,15 @@ export async function restoreBackup(data: any) {
       }
     }
     if (secret) await t("INSERT INTO settings (key, value) VALUES ('session_secret', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [secret.value]);
+  });
+  // Backups made before warehouses existed: put all stock in the main warehouse.
+  await tx(async (t) => {
+    const wh = await defaultWarehouseId(t);
+    const [has] = await t<{ n: number }>("SELECT count(*)::int n FROM product_stock");
+    if (!has.n) {
+      await t("INSERT INTO product_stock (product_id, warehouse_id, qty) SELECT id, $1, stock_qty FROM products WHERE NOT track_serial AND NOT is_service AND stock_qty <> 0", [wh]);
+    }
+    await t("UPDATE units SET warehouse_id=$1 WHERE warehouse_id IS NULL", [wh]);
   });
   // Two-step secrets are encrypted with this installation's key. If the backup came from another
   // installation they can't be read here, so switch two-step off for those users (they set it up again).
