@@ -1,6 +1,7 @@
 import "server-only";
 import { q, tx } from "./db";
 import { BACKUP_TABLES } from "./datasets";
+import { decryptField } from "./totp";
 
 export async function makeBackup() {
   const tables: Record<string, unknown[]> = {};
@@ -28,4 +29,14 @@ export async function restoreBackup(data: any) {
     }
     if (secret) await t("INSERT INTO settings (key, value) VALUES ('session_secret', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [secret.value]);
   });
+  // Two-step secrets are encrypted with this installation's key. If the backup came from another
+  // installation they can't be read here, so switch two-step off for those users (they set it up again).
+  const users = await q<{ id: number; totp_secret: string }>("SELECT id, totp_secret FROM users WHERE totp_secret <> ''");
+  for (const u of users) {
+    try {
+      await decryptField(u.totp_secret);
+    } catch {
+      await q("UPDATE users SET totp_enabled=FALSE, totp_secret='' WHERE id=$1", [u.id]);
+    }
+  }
 }

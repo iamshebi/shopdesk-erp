@@ -4,6 +4,7 @@ import { getUser, can } from "@/lib/auth";
 const TABS = [
   { href: "/settings", label: "Shop & invoices", perm: "settings" },
   { href: "/settings/staff", label: "Staff & roles", perm: "staff" },
+  { href: "/settings/security", label: "Security", perm: "staff" },
   { href: "/settings/data", label: "Import, export & backup", perm: "data" },
   { href: "/settings/activity", label: "Activity log", perm: "activity" },
 ];

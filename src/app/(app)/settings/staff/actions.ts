@@ -77,7 +77,8 @@ export async function resetPassword(fd: FormData) {
   const target = await one<any>("SELECT u.name, r.locked FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=$1", [id]);
   if (!target) back("Not found");
   if (target.locked && !isOwner(me) && id !== me.id) back("Only an owner can reset an owner's password");
-  await q("UPDATE users SET password_hash=$1 WHERE id=$2", [await bcrypt.hash(password, 10), id]);
+  await q("UPDATE users SET password_hash=$1, password_changed_at=now(), failed_logins=0, locked_until=NULL WHERE id=$2", [await bcrypt.hash(password, 10), id]);
+  await q("UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL", [id]);
   await log(me.id, "Password reset", target.name, "/settings/staff");
   back(`Password changed for ${target.name}`, true);
 }

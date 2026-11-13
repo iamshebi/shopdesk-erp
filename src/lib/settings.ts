@@ -21,6 +21,7 @@ export interface ShopSettings {
   invoice_terms: string;
   repair_terms: string;
   currency: string;
+  idle_timeout_minutes: number; // 0 = never sign out automatically
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   invoice_terms: "Goods once sold are covered by manufacturer warranty only. Returns accepted within 7 days with original packing and invoice.",
   repair_terms: "Devices not collected within 30 days of the ready notice may be disposed of. We are not responsible for data loss. Please back up your device.",
   currency: "AED",
+  idle_timeout_minutes: 30,
 };
 
 export const getSettings = cache(async (): Promise<ShopSettings> => {

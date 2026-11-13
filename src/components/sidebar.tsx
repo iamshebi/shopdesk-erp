@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X,
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle,
 } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
@@ -66,8 +66,10 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
         ))}
       </nav>
       <div className="border-t border-slate-100 p-4">
-        <div className="mb-2 text-sm font-medium">{props.userName}</div>
-        <div className="mb-3 text-xs capitalize text-slate-400">{props.role}</div>
+        <Link href="/account" onClick={() => setOpen(false)} className="mb-3 flex items-center gap-2 rounded-lg p-1 -m-1 hover:bg-slate-50">
+          <UserCircle size={28} strokeWidth={1.5} className="shrink-0 text-slate-400" />
+          <span className="min-w-0"><span className="block truncate text-sm font-medium">{props.userName}</span><span className="block text-xs capitalize text-slate-400">{props.role} · My account</span></span>
+        </Link>
         <form action={logout}>
           <button className="btn-ghost btn-sm w-full">
             <LogOut size={14} /> Sign out

@@ -4,7 +4,8 @@ import { getUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import LoginForm from "./form";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const sp = await searchParams;
   const n = await one<{ n: number }>("SELECT count(*)::int AS n FROM users");
   if (!n?.n) redirect("/setup");
   if (await getUser()) redirect("/");
@@ -24,6 +25,7 @@ export default async function LoginPage() {
           <h1 className="text-xl font-semibold tracking-tight">{s.shop_name}</h1>
           <p className="mt-1 text-sm text-slate-500">Sign in to continue</p>
         </div>
+        {sp.idle && <div className="card mb-4 bg-amber-50 p-3 text-center text-sm text-amber-800">You were signed out after a period of no activity.</div>}
         <LoginForm />
       </div>
     </main>

@@ -270,4 +270,32 @@ export const MIGRATIONS: string[] = [
      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );
    CREATE INDEX IF NOT EXISTS activity_created_idx ON activity (created_at DESC);`,
+
+  // 3. Security: server-side sessions, login history, lockout, two-factor login
+  `CREATE TABLE IF NOT EXISTS sessions (
+     id TEXT PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     ip TEXT NOT NULL DEFAULT '',
+     user_agent TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     revoked_at TIMESTAMPTZ
+   );
+   CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions (user_id, revoked_at);
+   CREATE TABLE IF NOT EXISTS login_events (
+     id SERIAL PRIMARY KEY,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     username TEXT NOT NULL DEFAULT '',
+     success BOOLEAN NOT NULL,
+     reason TEXT NOT NULL DEFAULT '',
+     ip TEXT NOT NULL DEFAULT '',
+     user_agent TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS login_events_created_idx ON login_events (created_at DESC);
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT NOT NULL DEFAULT '';
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ;`,
 ];

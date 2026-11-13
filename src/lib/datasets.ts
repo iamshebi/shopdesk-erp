@@ -69,5 +69,5 @@ export const DATASETS: Record<string, { label: string; sql: string; dated?: stri
 // Tables in dependency order, for full backup / restore.
 export const BACKUP_TABLES = [
   "settings", "counters", "roles", "users", "products", "suppliers", "customers", "purchases", "purchase_items", "buybacks",
-  "sales", "units", "sale_items", "payments", "repairs", "repair_logs", "expenses", "supplier_payments", "activity",
+  "sales", "units", "sale_items", "payments", "repairs", "repair_logs", "expenses", "supplier_payments", "activity", "login_events",
 ];

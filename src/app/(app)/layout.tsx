@@ -3,6 +3,7 @@ import { one } from "@/lib/db";
 import { getUser, canAny } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import Sidebar from "@/components/sidebar";
+import IdleLogout from "@/components/idle-logout";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const n = await one<{ n: number }>("SELECT count(*)::int AS n FROM users");
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         reportsHref={canAny(user, ["reports"]) ? "/reports" : canAny(user, ["reports.day"]) ? "/reports/day" : "/reports/vat"}
         settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : "/settings/activity"}
       />
+      <IdleLogout minutes={s.idle_timeout_minutes} />
       <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8">{children}</main>
     </div>
   );
