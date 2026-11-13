@@ -75,6 +75,7 @@ export default async function PrintOrder({ params, searchParams }: { params: Pro
           <div className="flex justify-between"><span>Total excl. VAT</span><span>{num(o.subtotal)}</span></div>
           <div className="flex justify-between"><span>VAT {s.vat_rate}%</span><span>{num(o.vat)}</span></div>
           <div className="flex justify-between border-t border-black pt-1 text-sm font-bold"><span>Total {s.currency}</span><span>{num(o.total)}</span></div>
+          {o.currency && Number(o.fx_rate) > 0 && <div className="flex justify-between text-xs"><span>≈ Total {o.currency} (rate {Number(o.fx_rate)})</span><span>{num(Number(o.total) * Number(o.fx_rate))}</span></div>}
           {doc === "proforma" && Number(o.advance) > 0 && <div className="flex justify-between"><span>Advance received</span><span>{num(o.advance)}</span></div>}
           {doc === "proforma" && Number(o.advance) > 0 && <div className="flex justify-between font-semibold"><span>Balance due</span><span>{num(Number(o.total) - Number(o.advance))}</span></div>}
           <div className="pt-1 text-[10px]">{amountInWords(Number(o.total))}</div>

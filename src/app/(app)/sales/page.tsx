@@ -34,6 +34,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader title={can(user, "sales.all") ? "Invoices" : "My invoices"} subtitle={`${inv.length} invoices · ${cn.length} returns · net ${num(net)}`}>
+        {can(user, "sales.payments") && <Link href="/sales/reminders" className="btn-ghost">Payment reminders</Link>}
+        {can(user, "sales.payments") && <Link href="/sales/recurring" className="btn-ghost">Recurring</Link>}
         {can(user, "pos") && <Link href="/pos" className="btn-primary"><Plus size={16} /> New sale</Link>}
       </PageHeader>
       <form className="mb-4 flex flex-wrap gap-2">

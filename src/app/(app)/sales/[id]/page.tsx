@@ -8,7 +8,9 @@ import { fmtDate, num, methodLabel, waLink, PAYMENT_METHODS } from "@/lib/util";
 import { PageHeader, Badge } from "@/components/ui";
 import Submit from "@/components/submit";
 import { Printer, MessageCircle, Plus } from "lucide-react";
-import { receivePayment, returnItems } from "../actions";
+import { receivePayment, returnItems, emailInvoice, makePayLink, setDueDate } from "../actions";
+import { emailReady } from "@/lib/email";
+import { saleToken } from "@/lib/public-link";
 
 export default async function SalePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const user = await requireUser("sales.view");
@@ -27,6 +29,10 @@ export default async function SalePage({ params, searchParams }: { params: Promi
   const returns = await q<any>("SELECT id, number, total, date FROM sales WHERE ref_sale_id=$1 ORDER BY id", [sale.id]);
   const isCN = sale.type === "credit_note";
   const anyReturnable = !isCN && items.some((i) => i.returnable > 0);
+  const canEmail = await emailReady();
+  const stripeOn = !!s.stripe_key_enc;
+  const custEmail = sale.customer_id ? (await one<{ email: string }>("SELECT email FROM customers WHERE id=$1", [sale.customer_id]))?.email ?? "" : "";
+  const publicPath = `/i/${await saleToken(sale.id)}`;
   const msg = `${s.shop_name}\n${isCN ? "Credit note" : "Invoice"} ${sale.number} · ${s.currency} ${num(sale.total)}\nThank you for shopping with us!`;
   return (
     <div className="max-w-4xl">
@@ -45,6 +51,21 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         {sale.customer_phone && <a href={waLink(sale.customer_phone, msg)} target="_blank" className="btn-ghost"><MessageCircle size={16} /> WhatsApp</a>}
       </PageHeader>
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
+      {sp.ok && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
+      {!isCN && (
+        <div className="card mb-6 flex flex-wrap items-center gap-2 p-4 text-sm">
+          <a href={publicPath} target="_blank" className="btn-ghost btn-sm">Customer view link</a>
+          {canEmail ? (
+            <form action={emailInvoice} className="flex gap-1"><input type="hidden" name="id" value={sale.id} /><input name="to" defaultValue={custEmail} placeholder="customer@email.com" className="input h-8 w-52 text-xs" /><Submit className="btn-ghost btn-sm">Email invoice</Submit></form>
+          ) : <span className="text-xs text-slate-400">Email: set up in Settings → Integrations</span>}
+          {sale.outstanding > 0.004 && (sale.pay_link
+            ? <><a href={sale.pay_link} target="_blank" className="btn-ghost btn-sm">Online payment link</a>{sale.customer_phone && <a href={waLink(sale.customer_phone, `${s.shop_name}: invoice ${sale.number}, ${s.currency} ${num(sale.outstanding)} due. Pay here: ${sale.pay_link}`)} target="_blank" className="btn-ghost btn-sm">Send link by WhatsApp</a>}</>
+            : stripeOn && can(user, "sales.payments") ? <form action={makePayLink}><input type="hidden" name="id" value={sale.id} /><Submit className="btn-ghost btn-sm">Create payment link</Submit></form> : null)}
+          {sale.outstanding > 0.004 && can(user, "sales.payments") && (
+            <form action={setDueDate} className="ml-auto flex items-center gap-1"><input type="hidden" name="id" value={sale.id} /><span className="text-xs text-slate-500">Due date</span><input type="date" name="due_date" defaultValue={sale.due_date ? String(sale.due_date instanceof Date ? sale.due_date.toISOString() : sale.due_date).slice(0, 10) : ""} className="input h-8 w-36 text-xs" /><Submit className="btn-ghost btn-sm">Set</Submit></form>
+          )}
+        </div>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <div className="card p-5">

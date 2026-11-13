@@ -10,6 +10,8 @@ import { MessageCircle } from "lucide-react";
 import { updateCustomer } from "../actions";
 import { addActivity, completeActivity, saveCustomerCrm } from "../../crm/actions";
 import { ACTIVITY_TYPES } from "@/lib/crm";
+import { redeemPoints } from "../../marketing/actions";
+import { getSettings } from "@/lib/settings";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   await requireUser("customers");
@@ -23,6 +25,9 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const acts = await q<any>("SELECT a.*, u.name uname FROM crm_activities a LEFT JOIN users u ON u.id=a.user_id WHERE a.customer_id=$1 ORDER BY a.id DESC LIMIT 50", [c.id]);
   const tickets = await q<any>("SELECT id, number, subject, status FROM tickets WHERE customer_id=$1 ORDER BY id DESC LIMIT 20", [c.id]);
   const back = `/customers/${c.id}`;
+  const st = await getSettings();
+  const pts = (await one<{ p: number }>("SELECT COALESCE(sum(points),0)::int p FROM loyalty_ledger WHERE customer_id=$1", [c.id]))!.p;
+  const vouchers = await q<any>("SELECT code, value, uses FROM coupons WHERE customer_id=$1 ORDER BY id DESC LIMIT 5", [c.id]);
   const orders = await q<any>("SELECT id, number, kind, status, total, created_at FROM orders WHERE customer_id=$1 ORDER BY id DESC LIMIT 20", [c.id]);
   return (
     <div className="max-w-5xl">
@@ -99,6 +104,15 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           <Field label="Address"><textarea name="address" defaultValue={c.address} rows={2} className="input" /></Field>
           <Submit className="btn-dark">Save</Submit>
         </form>
+        {(st.loyalty_points_per_unit > 0 || pts > 0) && (
+          <form action={redeemPoints} className="card space-y-2 p-5">
+            <h3 className="font-semibold">Loyalty: {pts} points</h3>
+            <p className="text-xs text-slate-500">Worth {st.currency} {(pts * Number(st.loyalty_point_value)).toFixed(2)} · min {st.loyalty_min_redeem} to redeem</p>
+            <input type="hidden" name="customer_id" value={c.id} />
+            <div className="flex gap-2"><input name="points" placeholder={String(pts)} className="input" inputMode="numeric" /><Submit className="btn-dark shrink-0">Make voucher</Submit></div>
+            {vouchers.map((v) => <div key={v.code} className="flex justify-between text-xs"><span className="font-mono">{v.code}</span><span>{Number(v.value).toFixed(2)} {v.uses ? "· used" : "· unused"}</span></div>)}
+          </form>
+        )}
         <form action={saveCustomerCrm} className="card h-fit space-y-3 p-5">
           <h3 className="font-semibold">Group, tags &amp; credit</h3>
           <input type="hidden" name="id" value={c.id} />

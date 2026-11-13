@@ -77,4 +77,5 @@ export const BACKUP_TABLES = [
   "accounts", "journal_entries", "bank_reconciliations", "journal_lines",
   "leads", "crm_activities", "tickets", "ticket_messages", "kb_articles",
   "departments", "employees", "attendance", "leave_requests", "payroll_runs", "payslips", "projects", "tasks", "task_comments",
+  "coupons", "loyalty_ledger", "currencies", "recurring_invoices", "shipments", "api_keys", "webhooks", "webhook_deliveries", "automation_rules", "automation_log", "email_log",
 ];

@@ -25,6 +25,9 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
       { key: "hr", label: "HR: employees, attendance, leave" },
       { key: "payroll", label: "Payroll & salaries" },
       { key: "tasks", label: "Tasks & projects" },
+      { key: "marketing", label: "Coupons & loyalty points" },
+      { key: "shipping", label: "Shipping & deliveries" },
+      { key: "integrations", label: "Integrations: API keys, webhooks, email, payments, automation" },
     ],
   },
   {

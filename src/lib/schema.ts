@@ -684,4 +684,135 @@ export const MIGRATIONS: string[] = [
      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );`,
+
+  // 11. Marketing (coupons, loyalty), recurring invoices, multi-currency, shipping, payment links,
+  //     API keys, webhooks, automation, email log
+  `CREATE TABLE IF NOT EXISTS coupons (
+     id SERIAL PRIMARY KEY,
+     code TEXT NOT NULL UNIQUE,
+     type TEXT NOT NULL DEFAULT 'percent',
+     value NUMERIC(12,2) NOT NULL DEFAULT 0,
+     min_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+     starts_on DATE,
+     ends_on DATE,
+     max_uses INTEGER NOT NULL DEFAULT 0,
+     uses INTEGER NOT NULL DEFAULT 0,
+     customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+     note TEXT NOT NULL DEFAULT '',
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS loyalty_ledger (
+     id SERIAL PRIMARY KEY,
+     customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+     points INTEGER NOT NULL,
+     sale_id INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+     note TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS coupon_code TEXT NOT NULL DEFAULT '';
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS pay_link TEXT NOT NULL DEFAULT '';
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS pay_link_ref TEXT NOT NULL DEFAULT '';
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS due_date DATE;
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS last_reminder_at TIMESTAMPTZ;
+   ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT '';
+   ALTER TABLE orders ADD COLUMN IF NOT EXISTS fx_rate NUMERIC(14,6) NOT NULL DEFAULT 1;
+   CREATE TABLE IF NOT EXISTS currencies (
+     code TEXT PRIMARY KEY,
+     name TEXT NOT NULL DEFAULT '',
+     rate NUMERIC(14,6) NOT NULL DEFAULT 1,
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS recurring_invoices (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     customer_id INTEGER NOT NULL REFERENCES customers(id),
+     lines JSONB NOT NULL DEFAULT '[]',
+     every TEXT NOT NULL DEFAULT 'month',
+     next_date DATE NOT NULL,
+     end_date DATE,
+     due_days INTEGER NOT NULL DEFAULT 7,
+     auto_email BOOLEAN NOT NULL DEFAULT FALSE,
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     runs INTEGER NOT NULL DEFAULT 0,
+     last_sale_id INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS shipments (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+     sale_id INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+     customer_name TEXT NOT NULL DEFAULT '',
+     customer_phone TEXT NOT NULL DEFAULT '',
+     address TEXT NOT NULL DEFAULT '',
+     courier TEXT NOT NULL DEFAULT '',
+     tracking_no TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL DEFAULT 'pending',
+     cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+     cod_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+     cod_collected BOOLEAN NOT NULL DEFAULT FALSE,
+     notes TEXT NOT NULL DEFAULT '',
+     shipped_at TIMESTAMPTZ,
+     delivered_at TIMESTAMPTZ,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS api_keys (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     prefix TEXT NOT NULL,
+     key_hash TEXT NOT NULL UNIQUE,
+     scopes TEXT NOT NULL DEFAULT 'read',
+     last_used_at TIMESTAMPTZ,
+     revoked BOOLEAN NOT NULL DEFAULT FALSE,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS webhooks (
+     id SERIAL PRIMARY KEY,
+     url TEXT NOT NULL,
+     events TEXT NOT NULL DEFAULT '*',
+     secret TEXT NOT NULL,
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS webhook_deliveries (
+     id SERIAL PRIMARY KEY,
+     webhook_id INTEGER NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+     event TEXT NOT NULL,
+     status INTEGER NOT NULL DEFAULT 0,
+     response TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS automation_rules (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     trigger TEXT NOT NULL,
+     threshold NUMERIC(12,2) NOT NULL DEFAULT 0,
+     action TEXT NOT NULL,
+     assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     email TEXT NOT NULL DEFAULT '',
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     last_run_at TIMESTAMPTZ,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS automation_log (
+     id SERIAL PRIMARY KEY,
+     rule_id INTEGER REFERENCES automation_rules(id) ON DELETE CASCADE,
+     dedupe_key TEXT NOT NULL,
+     message TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     UNIQUE (rule_id, dedupe_key)
+   );
+   CREATE TABLE IF NOT EXISTS email_log (
+     id SERIAL PRIMARY KEY,
+     to_addr TEXT NOT NULL,
+     subject TEXT NOT NULL,
+     status TEXT NOT NULL,
+     error TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );`,
 ];

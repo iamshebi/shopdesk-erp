@@ -47,9 +47,12 @@ export async function saveOrder(fd: FormData) {
     valid_until: str(fd, "valid_until") || null, delivery_method: str(fd, "delivery_method") || "pickup", delivery_address: str(fd, "delivery_address"),
     delivery_charge: delivery, expected_date: str(fd, "expected_date") || null, advance: Math.max(0, numf(fd, "advance")), advance_method: str(fd, "advance_method") || "cash",
     notes: str(fd, "notes"), terms: str(fd, "terms"), sales_rep_id: Number(str(fd, "sales_rep_id")) || null,
+    currency: str(fd, "currency") && str(fd, "currency") !== s.currency ? str(fd, "currency") : "",
+    fx_rate: 1 as number,
     subtotal: priced.subtotal, discount: priced.discount, vat: priced.vat, total: priced.total,
   };
   if (f.advance > f.total) go(back, "The advance is more than the order total", "err");
+  if (f.currency) f.fx_rate = Number((await one<{ rate: number }>("SELECT rate FROM currencies WHERE code=$1", [f.currency]))?.rate) || 1;
   const keys = Object.keys(f) as (keyof typeof f)[];
   const orderId = await tx(async (t) => {
     // Link or create the customer so the CRM profile stays up to date.
@@ -84,6 +87,7 @@ export async function saveOrder(fd: FormData) {
   }).catch((e) => go(back, e instanceof SaleError ? e.message : "Could not save. Please try again.", "err"));
   const o = await one<{ number: string }>("SELECT number FROM orders WHERE id=$1", [orderId]);
   await log(user.id, id ? `${kind === "quote" ? "Quotation" : "Order"} edited` : `${kind === "quote" ? "Quotation" : "Order"} created`, `${o?.number} · ${s.currency} ${num(f.total)}`, `/orders/${orderId}`);
+  if (!id) await (await import("@/lib/webhooks")).fireWebhook("order.created", { id: orderId, number: o?.number, kind, total: f.total, customer: f.customer_name, phone: f.customer_phone });
   revalidatePath("/orders");
   go(`/orders/${orderId}`, "Saved");
 }
@@ -112,7 +116,16 @@ export async function setOrderStatus(fd: FormData) {
   await tx(async (t) => {
     await t(`UPDATE orders SET status=$2, courier=COALESCE(NULLIF($3,''), courier), tracking_no=COALESCE(NULLIF($4,''), tracking_no), updated_at=now() WHERE id=$1`, [id, to, str(fd, "courier"), str(fd, "tracking_no")]);
     await addEvent(t, id, to, [str(fd, "note"), str(fd, "tracking_no") && `Tracking ${str(fd, "tracking_no")}`].filter(Boolean).join(" · "), user.id);
+    if (o.kind === "order" && to === "shipped") {
+      const [ex] = await t("SELECT id FROM shipments WHERE order_id=$1", [id]);
+      if (!ex) {
+        const num2 = await nextNumber(t, "shipment", "SHP-");
+        await t(`INSERT INTO shipments (number, order_id, customer_name, customer_phone, address, courier, tracking_no, status, cost, cod_amount, shipped_at, created_by)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,'in_transit',0,$8,now(),$9)`, [num2, id, o.customer_name, o.customer_phone, o.delivery_address || o.customer_address, str(fd, "courier") || o.courier, str(fd, "tracking_no") || o.tracking_no, Math.max(0, Number(o.total) - Number(o.advance)), user.id]);
+      }
+    }
   });
+  await (await import("@/lib/webhooks")).fireWebhook("order.status", { id, number: o.number, status: to });
   await log(user.id, `${o.kind === "quote" ? "Quotation" : "Order"} ${statusInfo(o.kind, to).label.toLowerCase()}`, o.number, `/orders/${id}`);
   revalidatePath("/orders");
   go(`/orders/${id}`, `Marked as ${statusInfo(o.kind, to).label}`);

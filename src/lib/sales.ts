@@ -3,6 +3,7 @@ import { moveQty, moveUnit } from "./inventory";
 import { Exec, nextNumber } from "./db";
 import { ShopSettings } from "./settings";
 import { lineVat, r2 } from "./util";
+import { checkCoupon, CouponError, earnPoints } from "./marketing";
 
 export interface SaleLineInput {
   product_id: number | null; // null = free-text line (e.g. repair service)
@@ -20,6 +21,8 @@ export interface SaleInput {
   payments: { method: string; amount: number; reference?: string }[];
   notes?: string;
   repair_id?: number | null;
+  coupon?: string;
+  due_date?: string | null;
   userId: number;
 }
 
@@ -52,6 +55,24 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
   if (!input.lines.length) throw new SaleError("The cart is empty");
   const usedUnits = new Set<number>();
   const computed: any[] = [];
+
+  // Coupon: spread the coupon amount over the lines as extra line discount (before VAT).
+  let coupon: { id: number; code: string; discount: number } | null = null;
+  if (input.coupon?.trim()) {
+    let cid = input.customer.id ?? null;
+    if (!cid && input.customer.phone) cid = (await t<{ id: number }>("SELECT id FROM customers WHERE phone=$1 LIMIT 1", [input.customer.phone]))[0]?.id ?? null;
+    const grosses = input.lines.map((l) => Math.max(0, Math.round(l.qty) * l.unit_price - (l.discount ?? 0)));
+    const sum = grosses.reduce((a, b) => a + b, 0);
+    try { coupon = await checkCoupon(t, input.coupon, sum, cid); } catch (e) { if (e instanceof CouponError) throw new SaleError(e.message); throw e; }
+    let left = coupon.discount;
+    input.lines.forEach((l, i) => {
+      const share = i === input.lines.length - 1 ? left : r2((coupon!.discount * grosses[i]) / (sum || 1));
+      const take = Math.min(share, left, grosses[i]);
+      l.discount = r2((l.discount ?? 0) + take);
+      left = r2(left - take);
+    });
+    await t("UPDATE coupons SET uses = uses + 1 WHERE id=$1", [coupon.id]);
+  }
 
   for (const l of input.lines) {
     const qty = Math.round(l.qty);
@@ -136,9 +157,9 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
   }
   const number = await nextNumber(t, "invoice", s.invoice_prefix || "INV-");
   const [sale] = await t<{ id: number }>(
-    `INSERT INTO sales (number, type, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, discount, vat, total, cost, paid, notes, repair_id, created_by)
-     VALUES ($1,'invoice',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
-    [number, customerId, input.customer.name, input.customer.phone, input.customer.trn, input.customer.address, subtotal, discount, vat, total, cost, paid, input.notes ?? "", input.repair_id ?? null, input.userId],
+    `INSERT INTO sales (number, type, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, discount, vat, total, cost, paid, notes, repair_id, created_by, coupon_code, due_date)
+     VALUES ($1,'invoice',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+    [number, customerId, input.customer.name, input.customer.phone, input.customer.trn, input.customer.address, subtotal, discount, vat, total, cost, paid, input.notes ?? "", input.repair_id ?? null, input.userId, coupon?.code ?? "", input.due_date ?? null],
   );
 
   for (const c of computed) {
@@ -159,6 +180,7 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
       await t("INSERT INTO payments (sale_id, method, amount, reference, created_by) VALUES ($1,$2,$3,$4,$5)", [sale.id, p.method, p.amount, p.reference ?? "", input.userId]);
     }
   }
+  await earnPoints(t, s, sale.id, customerId, total, number);
   return sale.id;
 }
 

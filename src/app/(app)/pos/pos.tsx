@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Minus, Plus, Trash2, User, X } from "lucide-react";
 import ProductPicker from "@/components/product-picker";
 import { availableUnits, searchCustomers, type ProductHit } from "../lookup-actions";
-import { checkout } from "./actions";
+import { checkout, previewCoupon } from "./actions";
 import { PAYMENT_METHODS } from "@/lib/util";
 
 interface Line {
@@ -34,6 +34,8 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
   const [showB2B, setShowB2B] = useState(false);
   const [pays, setPays] = useState<{ method: string; amount: string }[]>([{ method: "cash", amount: "" }]);
   const [notes, setNotes] = useState("");
+  const [coupon, setCoupon] = useState("");
+  const [couponInfo, setCouponInfo] = useState<{ discount: number; label: string } | null>(null);
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
 
@@ -65,10 +67,12 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
 
   const upd = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
+  const grossSum = useMemo(() => lines.reduce((a, l) => a + Math.max(0, l.qty * n(l.price) - n(l.discount)), 0), [lines]);
   const totals = useMemo(() => {
-    let total = 0, vat = 0, disc = 0;
+    let total = 0, vat = 0, disc = couponInfo ? Math.min(couponInfo.discount, grossSum) : 0;
+    const factor = grossSum > 0 ? (grossSum - disc) / grossSum : 1;
     for (const l of lines) {
-      const gross = l.qty * n(l.price) - n(l.discount);
+      const gross = (l.qty * n(l.price) - n(l.discount)) * factor;
       disc += n(l.discount);
       const marginUnit = l.units.find((u) => u.id === l.unit_id)?.margin_scheme;
       if (vatRate > 0 && !marginUnit) {
@@ -77,7 +81,13 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
       } else total += gross;
     }
     return { total, vat, disc, net: total - vat };
-  }, [lines, vatRate, inclusive]);
+  }, [lines, vatRate, inclusive, couponInfo, grossSum]);
+  useEffect(() => { setCouponInfo(null); }, [grossSum]);
+  async function applyCoupon() {
+    if (!coupon.trim()) { setCouponInfo(null); return; }
+    const r = await previewCoupon(coupon, grossSum, { id: customer.id, phone: customer.phone });
+    if (r.error) { setError(r.error); setCouponInfo(null); } else { setError(""); setCouponInfo({ discount: r.discount!, label: r.label! }); }
+  }
 
   const paid = pays.filter((p) => p.method !== "credit").reduce((a, p) => a + n(p.amount), 0);
   const effectivePaid = pays.length === 1 && pays[0].amount === "" && pays[0].method !== "credit" ? totals.total : paid;
@@ -101,6 +111,7 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
       const r = await checkout({
         customer,
         notes,
+        coupon: couponInfo ? coupon : "",
         lines: lines.map((l) => ({ product_id: l.product.id, unit_id: l.unit_id, qty: l.qty, unit_price: n(l.price), discount: n(l.discount) })),
         payments,
       });
@@ -223,6 +234,11 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
               {change < -0.004 && <div className="flex justify-between font-medium text-amber-700"><span>Balance on credit</span><span className="tabular-nums">{f2(-change)}</span></div>}
             </div>
           )}
+          <div className="flex gap-2">
+            <input className="input uppercase" placeholder="Coupon / voucher code" value={coupon} onChange={(e) => { setCoupon(e.target.value); setCouponInfo(null); }} />
+            <button type="button" className="btn-ghost shrink-0" onClick={applyCoupon} disabled={!lines.length}>Apply</button>
+          </div>
+          {couponInfo && <div className="flex justify-between text-sm text-emerald-700"><span>Coupon {coupon.toUpperCase()} ({couponInfo.label})</span><span className="tabular-nums">−{f2(couponInfo.discount)}</span></div>}
           <input className="input" placeholder="Note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
           {error && <div className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</div>}
           <button className="btn-primary h-12 w-full text-base" disabled={!lines.length || pending} onClick={complete}>

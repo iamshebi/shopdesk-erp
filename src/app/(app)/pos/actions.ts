@@ -39,6 +39,9 @@ export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id
       await log(user.id, "Sale", `${row.number} · ${s.currency} ${num(row.total)}${payload.customer.name ? ` · ${payload.customer.name}` : ""}${notes.length ? ` · ${notes.join("; ")}` : ""}`, `/sales/${sid}`, t);
       return sid;
     });
+    const { fireWebhook } = await import("@/lib/webhooks");
+    const sale = (await q<any>("SELECT id, number, total, paid, customer_name, customer_phone, coupon_code FROM sales WHERE id=$1", [id]))[0];
+    await fireWebhook("sale.created", sale);
     revalidatePath("/");
     revalidatePath("/sales");
     revalidatePath("/products");
@@ -47,5 +50,20 @@ export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id
     if (e instanceof SaleError) return { error: e.message };
     console.error(e);
     return { error: "Could not save the sale. Please try again." };
+  }
+}
+
+export async function previewCoupon(code: string, gross: number, customer: { id: number | null; phone: string }): Promise<{ discount?: number; label?: string; error?: string }> {
+  await requireUser("pos");
+  const { checkCoupon, CouponError } = await import("@/lib/marketing");
+  try {
+    return await tx(async (t) => {
+      let cid = customer.id;
+      if (!cid && customer.phone) cid = (await t<{ id: number }>("SELECT id FROM customers WHERE phone=$1 LIMIT 1", [customer.phone]))[0]?.id ?? null;
+      const c = await checkCoupon(t, code, gross, cid);
+      return { discount: c.discount, label: c.label };
+    });
+  } catch (e) {
+    return { error: e instanceof CouponError ? e.message : "Could not check the coupon" };
   }
 }

@@ -19,7 +19,7 @@ export default async function EditOrder({ params, searchParams }: { params: Prom
     <div className="max-w-5xl">
       <PageHeader title={`Edit ${o.number}`} />
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
-      <OrderForm action={saveOrder} kind={o.kind} order={o} items={items} reps={reps} currency={s.currency} canDiscount={can(user, "sales.discount")} defaultTerms="" />
+      <OrderForm currencies={await q<any>("SELECT code, rate FROM currencies ORDER BY code")} action={saveOrder} kind={o.kind} order={o} items={items} reps={reps} currency={s.currency} canDiscount={can(user, "sales.discount")} defaultTerms="" />
     </div>
   );
 }

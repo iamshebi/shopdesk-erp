@@ -18,6 +18,7 @@ export default function OrderForm(props: {
   currency: string;
   canDiscount: boolean;
   defaultTerms: string;
+  currencies?: { code: string; rate: number }[];
 }) {
   const o = props.order ?? {};
   const [lines, setLines] = useState<Line[]>(
@@ -76,6 +77,7 @@ export default function OrderForm(props: {
       <section className="card grid gap-4 p-6 sm:grid-cols-3">
         <h2 className="font-semibold sm:col-span-3">{quote ? "Quotation details" : "Delivery & payment"}</h2>
         <div><label className="label">Source</label><select name="source" defaultValue={o.source ?? "shop"} className="input"><option value="shop">In shop</option><option value="phone">Phone</option><option value="whatsapp">WhatsApp</option><option value="website">Website</option><option value="instagram">Instagram</option><option value="other">Other</option></select></div>
+        {(props.currencies?.length ?? 0) > 0 && <div><label className="label">Show prices also in</label><select name="currency" defaultValue={o.currency ?? ""} className="input"><option value="">{props.currency} only</option>{props.currencies!.map((c) => <option key={c.code} value={c.code}>{c.code} (1 {props.currency} = {Number(c.rate)})</option>)}</select></div>}
         <div><label className="label">Sales person</label><select name="sales_rep_id" defaultValue={o.sales_rep_id ?? ""} className="input"><option value="">—</option>{props.reps.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
         {quote ? (
           <div><label className="label">Valid until</label><input type="date" name="valid_until" defaultValue={o.valid_until ?? ""} className="input" /></div>

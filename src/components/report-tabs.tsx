@@ -6,6 +6,7 @@ const TABS = [
   { href: "/reports/day", label: "Day close", perm: "reports.day" },
   { href: "/reports/vat", label: "VAT return", perm: "reports.vat" },
   { href: "/reports/stock", label: "Stock", perm: "reports" },
+  { href: "/reports/builder", label: "Report builder", perm: "reports" },
 ];
 
 export default async function ReportTabs({ active, from, to }: { active: string; from?: string; to?: string }) {

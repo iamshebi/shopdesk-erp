@@ -30,6 +30,17 @@ export interface ShopSettings {
   website_show_prices: boolean;
   wps_employer_id: string;
   wps_bank_routing: string;
+  loyalty_points_per_unit: number;
+  loyalty_point_value: number;
+  loyalty_min_redeem: number;
+  email_from: string;
+  resend_key_enc: string;
+  stripe_key_enc: string;
+  stripe_webhook_secret_enc: string;
+  daily_report_email: string;
+  auto_reminders: boolean;
+  reminder_every_days: number;
+  couriers: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -60,6 +71,17 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   website_show_prices: false,
   wps_employer_id: "",
   wps_bank_routing: "",
+  loyalty_points_per_unit: 0,
+  loyalty_point_value: 0.05,
+  loyalty_min_redeem: 100,
+  email_from: "",
+  resend_key_enc: "",
+  stripe_key_enc: "",
+  stripe_webhook_secret_enc: "",
+  daily_report_email: "",
+  auto_reminders: false,
+  reminder_every_days: 7,
+  couriers: "Aramex|https://www.aramex.com/track/results?ShipmentNumber={n}\nDHL|https://www.dhl.com/ae-en/home/tracking.html?tracking-id={n}\nEmirates Post|https://www.emiratespost.ae/track?trackno={n}\nOwn driver|",
 };
 
 export const getSettings = cache(async (): Promise<ShopSettings> => {

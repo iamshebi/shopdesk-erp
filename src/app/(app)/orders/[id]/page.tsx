@@ -42,6 +42,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         {editable && <Link href={`/orders/${o.id}/edit`} className="btn-ghost"><Pencil size={15} /> Edit</Link>}
         <Link href={`/print/order/${o.id}?doc=${isQuote ? "quote" : "proforma"}`} target="_blank" className="btn-ghost"><Printer size={15} /> {isQuote ? "Quotation" : "Proforma"}</Link>
         {!isQuote && <Link href={`/print/order/${o.id}?doc=delivery`} target="_blank" className="btn-ghost"><Truck size={15} /> Delivery note</Link>}
+        {!isQuote && <Link href={`/shipping?order=${o.id}`} className="btn-ghost">Ship with courier</Link>}
         {wa && <a href={wa} target="_blank" className="btn-ghost"><MessageCircle size={15} /> WhatsApp</a>}
         <form action={duplicateOrder}><input type="hidden" name="id" value={o.id} /><Submit className="btn-ghost"><Copy size={15} /> Copy</Submit></form>
       </PageHeader>

@@ -13,9 +13,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
   const s = await getSettings();
   const NAV_PERMS: Record<string, string[]> = {
-    dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], accounting: ["accounting"], crm: ["crm"], support: ["support"], hr: ["hr", "payroll"], tasks: ["tasks"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
+    dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], accounting: ["accounting"], crm: ["crm"], support: ["support"], hr: ["hr", "payroll"], tasks: ["tasks"], marketing: ["marketing"], shipping: ["shipping"], automation: ["integrations"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
     purchases: ["purchases"], suppliers: ["suppliers"], customers: ["customers"], expenses: ["expenses"],
-    reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity"],
+    reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity", "integrations"],
   };
   const areas = Object.entries(NAV_PERMS).filter(([, p]) => p.length === 0 || canAny(user, p)).map(([a]) => a);
   const ACTIONS = [
@@ -34,6 +34,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { title: "Mark attendance", href: "/hr/attendance", perm: "hr" },
     { title: "Leave requests", href: "/hr/leave", perm: "hr" },
     { title: "Prepare payroll", href: "/hr/payroll", perm: "payroll" },
+    { title: "Payment reminders (unpaid invoices)", href: "/sales/reminders", perm: "sales.payments" },
+    { title: "Recurring invoices", href: "/sales/recurring", perm: "sales.payments" },
+    { title: "Create a coupon", href: "/marketing", perm: "marketing" },
+    { title: "New shipment", href: "/shipping?new=1", perm: "shipping" },
+    { title: "Automation rules", href: "/automation", perm: "integrations" },
+    { title: "Integrations: email, payments, API keys", href: "/settings/integrations", perm: "integrations" },
+    { title: "Report builder", href: "/reports/builder", perm: "reports" },
     { title: "Record an expense", href: "/expenses", perm: "expenses" },
     { title: "Day close", href: "/reports/day", perm: "reports.day" },
     { title: "VAT return report", href: "/reports/vat", perm: "reports.vat" },
@@ -54,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         role={user.role}
         areas={areas}
         reportsHref={canAny(user, ["reports"]) ? "/reports" : canAny(user, ["reports.day"]) ? "/reports/day" : "/reports/vat"}
-        settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : "/settings/activity"}
+        settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : canAny(user, ["integrations"]) ? "/settings/integrations" : "/settings/activity"}
       />
       <IdleLogout minutes={s.idle_timeout_minutes} />
       <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8">{children}</main>
