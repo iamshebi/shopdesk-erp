@@ -13,13 +13,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
   const s = await getSettings();
   const NAV_PERMS: Record<string, string[]> = {
-    dashboard: [], pos: ["pos"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
+    dashboard: [], pos: ["pos"], orders: ["orders"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
     purchases: ["purchases"], suppliers: ["suppliers"], customers: ["customers"], expenses: ["expenses"],
     reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity"],
   };
   const areas = Object.entries(NAV_PERMS).filter(([, p]) => p.length === 0 || canAny(user, p)).map(([a]) => a);
   const ACTIONS = [
     { title: "New sale", href: "/pos", perm: "pos" },
+    { title: "New sales order", href: "/orders/new", perm: "orders" },
+    { title: "New quotation", href: "/orders/new?kind=quote", perm: "orders" },
     { title: "New repair job card", href: "/repairs/new", perm: "repairs" },
     { title: "Buy a used device", href: "/buyback/new", perm: "buyback" },
     { title: "Add a product", href: "/products/new", perm: "products.edit" },

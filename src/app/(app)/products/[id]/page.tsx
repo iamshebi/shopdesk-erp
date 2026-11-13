@@ -4,6 +4,7 @@ import { q, one } from "@/lib/db";
 import { requireUser, can } from "@/lib/auth";
 import { STOCK_SQL } from "@/lib/stock";
 import { WH_STOCK_SQL } from "@/lib/inventory";
+import { RESERVED_SQL } from "@/lib/orders";
 import { fmtDate, num } from "@/lib/util";
 import { PageHeader, Badge, Empty } from "@/components/ui";
 import ProductForm from "@/components/product-form";
@@ -36,6 +37,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
      FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id=$1`,
     [p.id],
   );
+  const reserved = p.is_service ? 0 : Number((await one<{ r: number }>(`SELECT ${RESERVED_SQL("p")} r FROM products p WHERE p.id=$1`, [p.id]))?.r ?? 0);
   const byWh = p.is_service ? [] : await q<any>(`SELECT w.id, w.name, w.is_default, ${WH_STOCK_SQL("p", "w.id")} AS qty FROM warehouses w, products p WHERE p.id=$1 AND w.active ORDER BY w.is_default DESC, w.name`, [p.id]);
   const history = await q<any>("SELECT h.*, u.name FROM product_history h LEFT JOIN users u ON u.id=h.user_id WHERE h.product_id=$1 ORDER BY h.id DESC LIMIT 100", [p.id]);
   const canAdjust = can(user, "stock.adjust");
@@ -58,7 +60,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
       {p.tags && <div className="mb-4 flex flex-wrap gap-1.5">{p.tags.split(",").map((t: string) => <Link key={t} href={`/products?tag=${encodeURIComponent(t.trim())}`}><Badge tone="blue">{t.trim()}</Badge></Link>)}</div>}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <div className="card p-5"><div className="text-xs text-slate-500">In stock</div><div className="mt-1 text-2xl font-semibold">{p.is_service ? "—" : p.stock}</div></div>
+        <div className="card p-5"><div className="text-xs text-slate-500">In stock</div><div className="mt-1 text-2xl font-semibold">{p.is_service ? "—" : p.stock}</div>{reserved > 0 && <div className="mt-1 text-xs text-slate-500">{reserved} reserved for orders · {p.stock - reserved} free</div>}</div>
         <div className="card p-5"><div className="text-xs text-slate-500">Units sold (all time)</div><div className="mt-1 text-2xl font-semibold">{sold?.qty ?? 0}</div></div>
         <div className="card p-5"><div className="text-xs text-slate-500">Revenue (all time)</div><div className="mt-1 text-2xl font-semibold">{num(sold?.revenue)}</div></div>
       </div>

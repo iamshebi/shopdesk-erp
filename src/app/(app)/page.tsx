@@ -62,6 +62,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             (SELECT count(*)::int FROM (SELECT ${STOCK_SQL} st FROM products p WHERE p.active AND NOT p.is_service) x WHERE st <= 0) out_of_stock`,
     [from, to],
   );
+  const ord = await one<any>(`SELECT count(*) FILTER (WHERE status IN ('draft','confirmed','packed','shipped'))::int pending, count(*) FILTER (WHERE status='delivered' AND (updated_at AT TIME ZONE 'Asia/Dubai')::date BETWEEN $1 AND $2)::int done FROM orders WHERE kind='order'`, [from, to]);
   const pct = (a: number, b: number) => (b ? `${a >= b ? "▲" : "▼"} ${Math.abs(((a - b) / Math.abs(b)) * 100).toFixed(0)}% vs previous` : a ? "▲ new this period" : "no change");
   const PERIODS = [["today", "Today"], ["week", "7 days"], ["month", "This month"], ["year", "This year"]];
   const repairs = await q<any>("SELECT id, number, device, customer_name, status, promised_at FROM repairs WHERE status NOT IN ('delivered','cancelled') ORDER BY (status='ready') DESC, promised_at NULLS LAST LIMIT 6");
@@ -110,9 +111,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="Products" value={String(biz.products)} hint={`${biz.categories} categories · ${biz.brands} brands · ${biz.out_of_stock} out of stock`} href="/products" />
         <Stat label="Customers" value={String(biz.customers)} hint={`${biz.new_customers} new in this period`} href="/customers" />
+        <Stat label="Orders pending" value={String(ord?.pending ?? 0)} hint={`${ord?.done ?? 0} delivered in this period`} href="/orders?status=open" />
         {showProfit ? <Stat label="Stock value (at cost)" value={`${s.currency} ${num(biz.stock_value)}`} hint="everything in stock now" href="/reports/stock" /> : <Stat label="Open repairs" value={String(repairCount?.open ?? 0)} hint={`${repairCount?.ready ?? 0} ready for pickup`} href="/repairs" />}
         {showMoney ? <Stat label="Customers owe" value={`${s.currency} ${num(owed?.v)}`} hint={`unpaid invoices · ${repairCount?.open ?? 0} open repairs`} href="/customers?due=1" /> : null}
       </div>

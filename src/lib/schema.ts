@@ -395,4 +395,61 @@ export const MIGRATIONS: string[] = [
      FROM products p WHERE NOT p.track_serial AND NOT p.is_service AND p.stock_qty <> 0
        AND NOT EXISTS (SELECT 1 FROM product_stock);
    UPDATE units SET warehouse_id = (SELECT id FROM warehouses WHERE is_default ORDER BY id LIMIT 1) WHERE warehouse_id IS NULL;`,
+
+  // 6. Sales orders and quotations (also printed as proforma invoices and delivery notes)
+  `CREATE TABLE IF NOT EXISTS orders (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     kind TEXT NOT NULL DEFAULT 'order',
+     status TEXT NOT NULL DEFAULT 'draft',
+     customer_id INTEGER REFERENCES customers(id),
+     customer_name TEXT NOT NULL DEFAULT '',
+     customer_phone TEXT NOT NULL DEFAULT '',
+     customer_email TEXT NOT NULL DEFAULT '',
+     customer_trn TEXT NOT NULL DEFAULT '',
+     customer_address TEXT NOT NULL DEFAULT '',
+     source TEXT NOT NULL DEFAULT 'shop',
+     sales_rep_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     valid_until DATE,
+     delivery_method TEXT NOT NULL DEFAULT 'pickup',
+     delivery_address TEXT NOT NULL DEFAULT '',
+     delivery_charge NUMERIC(12,2) NOT NULL DEFAULT 0,
+     courier TEXT NOT NULL DEFAULT '',
+     tracking_no TEXT NOT NULL DEFAULT '',
+     expected_date DATE,
+     advance NUMERIC(12,2) NOT NULL DEFAULT 0,
+     advance_method TEXT NOT NULL DEFAULT 'cash',
+     subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+     discount NUMERIC(12,2) NOT NULL DEFAULT 0,
+     vat NUMERIC(12,2) NOT NULL DEFAULT 0,
+     total NUMERIC(12,2) NOT NULL DEFAULT 0,
+     notes TEXT NOT NULL DEFAULT '',
+     terms TEXT NOT NULL DEFAULT '',
+     sale_id INTEGER REFERENCES sales(id),
+     ref_order_id INTEGER REFERENCES orders(id),
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS orders_kind_status_idx ON orders (kind, status);
+   CREATE TABLE IF NOT EXISTS order_items (
+     id SERIAL PRIMARY KEY,
+     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+     product_id INTEGER REFERENCES products(id),
+     description TEXT NOT NULL,
+     qty INTEGER NOT NULL,
+     unit_price NUMERIC(12,2) NOT NULL,
+     discount NUMERIC(12,2) NOT NULL DEFAULT 0,
+     net NUMERIC(12,2) NOT NULL DEFAULT 0,
+     vat NUMERIC(12,2) NOT NULL DEFAULT 0,
+     total NUMERIC(12,2) NOT NULL DEFAULT 0
+   );
+   CREATE TABLE IF NOT EXISTS order_events (
+     id SERIAL PRIMARY KEY,
+     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+     status TEXT NOT NULL,
+     note TEXT NOT NULL DEFAULT '',
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );`,
 ];

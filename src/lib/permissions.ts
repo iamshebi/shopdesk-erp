@@ -11,6 +11,7 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
     group: "Sales",
     perms: [
       { key: "pos", label: "Make sales (POS)" },
+      { key: "orders", label: "Sales orders & quotations" },
       { key: "sales.view", label: "View invoices" },
       { key: "sales.all", label: "See invoices made by other staff", hint: "Without this, staff only see their own sales" },
       { key: "sales.price", label: "Change the selling price at the till" },

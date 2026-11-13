@@ -73,7 +73,7 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
 
       {sp.ok && <div className="card mt-6 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
       <section className="card mt-6 flex flex-wrap items-center justify-between gap-3 p-6">
-        <div><h2 className="font-semibold">Sample data</h2><p className="mt-1 text-sm text-slate-500">Adds 5 fictional products, 3 customers and 2 suppliers so you can try sales, stock and reports.</p></div>
+        <div><h2 className="font-semibold">Sample data</h2><p className="mt-1 text-sm text-slate-500">Adds 5 fictional products, 3 customers, 2 suppliers and 3 sales orders so you can try sales, stock and reports.</p></div>
         <form action={loadDemo}><Submit className="btn-ghost">Load sample data</Submit></form>
       </section>
 

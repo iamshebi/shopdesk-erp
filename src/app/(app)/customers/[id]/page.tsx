@@ -17,6 +17,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const sales = await q<any>(`SELECT s.*, ${OUTSTANDING_SQL} outstanding FROM sales s WHERE customer_id=$1 ORDER BY date DESC`, [c.id]);
   const repairs = await q<any>("SELECT * FROM repairs WHERE customer_id=$1 ORDER BY created_at DESC", [c.id]);
   const owes = sales.filter((s) => s.type === "invoice").reduce((a, s) => a + Math.max(0, s.outstanding), 0);
+  const orders = await q<any>("SELECT id, number, kind, status, total, created_at FROM orders WHERE customer_id=$1 ORDER BY id DESC LIMIT 20", [c.id]);
   return (
     <div className="max-w-5xl">
       <PageHeader title={c.name} subtitle={`${c.phone}${c.trn ? ` · TRN ${c.trn}` : ""} · customer since ${fmtDate(c.created_at)}`}>
@@ -64,6 +65,18 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <Submit className="btn-dark">Save</Submit>
         </form>
       </div>
+      {orders.length > 0 && (
+        <div className="card mt-6 overflow-x-auto">
+          <div className="p-5 pb-2 font-semibold">Orders &amp; quotations</div>
+          <table className="tbl">
+            <thead><tr><th>Number</th><th>Date</th><th>Status</th><th className="text-right">Total</th></tr></thead>
+            <tbody>{orders.map((o) => (
+              <tr key={o.id}><td><Link href={`/orders/${o.id}`} className="font-medium hover:text-accent">{o.number}</Link> <span className="text-xs text-slate-400">{o.kind === "quote" ? "quotation" : "order"}</span></td>
+                <td className="text-slate-500">{fmtDate(o.created_at)}</td><td className="capitalize">{o.status}</td><td className="text-right tabular-nums">{num(o.total)}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
