@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList,
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe,
 } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
@@ -45,7 +45,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { area: "reports", href: "/reports", label: "Reports", icon: BarChart3 },
     ],
   },
-  { id: "admin", label: "Administration", items: [{ area: "settings", href: "/settings", label: "Settings", icon: Settings }] },
+  { id: "admin", label: "Administration", items: [{ area: "website", href: "/website", label: "Website", icon: Globe }, { area: "settings", href: "/settings", label: "Settings", icon: Settings }] },
 ];
 
 function setTheme(dark: boolean) {

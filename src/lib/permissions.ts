@@ -58,6 +58,7 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
     group: "Administration",
     perms: [
       { key: "settings", label: "Shop settings, logo & invoice details" },
+      { key: "website", label: "Publish products to the website" },
       { key: "staff", label: "Manage staff logins & roles" },
       { key: "data", label: "Export data, backup & restore" },
       { key: "activity", label: "View the activity log" },

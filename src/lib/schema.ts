@@ -452,4 +452,18 @@ export const MIGRATIONS: string[] = [
      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );`,
+
+  // 7. Website connection: product links to the website catalogue, publish history
+  `ALTER TABLE products ADD COLUMN IF NOT EXISTS web_id TEXT NOT NULL DEFAULT '';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
+   CREATE INDEX IF NOT EXISTS products_web_id_idx ON products (web_id);
+   CREATE TABLE IF NOT EXISTS website_publishes (
+     id SERIAL PRIMARY KEY,
+     summary TEXT NOT NULL DEFAULT '',
+     added INTEGER NOT NULL DEFAULT 0,
+     updated INTEGER NOT NULL DEFAULT 0,
+     commit_sha TEXT NOT NULL DEFAULT '',
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );`,
 ];

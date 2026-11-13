@@ -22,6 +22,12 @@ export interface ShopSettings {
   repair_terms: string;
   currency: string;
   idle_timeout_minutes: number; // 0 = never sign out automatically
+  website_url: string;
+  website_repo: string; // e.g. iamshebi/zaitoon-mobiles
+  website_branch: string;
+  website_path: string;
+  website_token_enc: string; // GitHub token, encrypted
+  website_show_prices: boolean;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -44,6 +50,12 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   repair_terms: "Devices not collected within 30 days of the ready notice may be disposed of. We are not responsible for data loss. Please back up your device.",
   currency: "AED",
   idle_timeout_minutes: 30,
+  website_url: "",
+  website_repo: "",
+  website_branch: "main",
+  website_path: "catalog.json",
+  website_token_enc: "",
+  website_show_prices: false,
 };
 
 export const getSettings = cache(async (): Promise<ShopSettings> => {

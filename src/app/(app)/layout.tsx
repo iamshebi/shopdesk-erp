@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
   const s = await getSettings();
   const NAV_PERMS: Record<string, string[]> = {
-    dashboard: [], pos: ["pos"], orders: ["orders"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
+    dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
     purchases: ["purchases"], suppliers: ["suppliers"], customers: ["customers"], expenses: ["expenses"],
     reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity"],
   };

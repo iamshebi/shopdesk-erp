@@ -73,5 +73,5 @@ export const BACKUP_TABLES = [
   "settings", "counters", "roles", "users", "warehouses", "products", "suppliers", "customers", "purchases", "purchase_items", "buybacks",
   "sales", "units", "sale_items", "payments", "repairs", "repair_logs", "expenses", "supplier_payments", "activity", "login_events", "product_history",
   "product_stock", "stock_moves", "stock_transfers", "stock_transfer_items", "stock_counts", "stock_count_items",
-  "orders", "order_items", "order_events",
+  "orders", "order_items", "order_events", "website_publishes",
 ];
