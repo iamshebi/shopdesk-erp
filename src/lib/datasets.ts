@@ -75,4 +75,5 @@ export const BACKUP_TABLES = [
   "product_stock", "stock_moves", "stock_transfers", "stock_transfer_items", "stock_counts", "stock_count_items",
   "orders", "order_items", "order_events", "website_publishes",
   "accounts", "journal_entries", "bank_reconciliations", "journal_lines",
+  "leads", "crm_activities", "tickets", "ticket_messages", "kb_articles",
 ];

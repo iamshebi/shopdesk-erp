@@ -20,6 +20,8 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
       { key: "sales.returns", label: "Process returns & refunds" },
       { key: "sales.payments", label: "Receive payments on unpaid invoices" },
       { key: "customers", label: "View & edit customers" },
+      { key: "crm", label: "CRM: leads, follow-ups, customer groups" },
+      { key: "support", label: "Support tickets & knowledge base" },
     ],
   },
   {

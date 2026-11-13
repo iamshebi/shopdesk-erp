@@ -509,4 +509,77 @@ export const MIGRATIONS: string[] = [
    );
    CREATE INDEX IF NOT EXISTS journal_lines_account_idx ON journal_lines (account_id);
    CREATE INDEX IF NOT EXISTS journal_lines_entry_idx ON journal_lines (entry_id);`,
+
+  // 9. CRM (leads, activities, customer groups) and customer support (tickets, knowledge base)
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS group_name TEXT NOT NULL DEFAULT '';
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT '';
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12,2) NOT NULL DEFAULT 0;
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+   CREATE TABLE IF NOT EXISTS leads (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     phone TEXT NOT NULL DEFAULT '',
+     email TEXT NOT NULL DEFAULT '',
+     company TEXT NOT NULL DEFAULT '',
+     source TEXT NOT NULL DEFAULT 'walk-in',
+     interest TEXT NOT NULL DEFAULT '',
+     value NUMERIC(12,2) NOT NULL DEFAULT 0,
+     stage TEXT NOT NULL DEFAULT 'new',
+     owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     next_followup DATE,
+     lost_reason TEXT NOT NULL DEFAULT '',
+     customer_id INTEGER REFERENCES customers(id),
+     notes TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS crm_activities (
+     id SERIAL PRIMARY KEY,
+     customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+     lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+     type TEXT NOT NULL DEFAULT 'note',
+     body TEXT NOT NULL DEFAULT '',
+     due_date DATE,
+     done BOOLEAN NOT NULL DEFAULT FALSE,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS crm_activities_due_idx ON crm_activities (done, due_date);
+   CREATE TABLE IF NOT EXISTS tickets (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     customer_id INTEGER REFERENCES customers(id),
+     customer_name TEXT NOT NULL DEFAULT '',
+     customer_phone TEXT NOT NULL DEFAULT '',
+     subject TEXT NOT NULL,
+     category TEXT NOT NULL DEFAULT 'inquiry',
+     priority TEXT NOT NULL DEFAULT 'normal',
+     status TEXT NOT NULL DEFAULT 'open',
+     channel TEXT NOT NULL DEFAULT 'shop',
+     reference TEXT NOT NULL DEFAULT '',
+     assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     resolved_at TIMESTAMPTZ
+   );
+   CREATE TABLE IF NOT EXISTS ticket_messages (
+     id SERIAL PRIMARY KEY,
+     ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+     body TEXT NOT NULL,
+     internal BOOLEAN NOT NULL DEFAULT FALSE,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS kb_articles (
+     id SERIAL PRIMARY KEY,
+     title TEXT NOT NULL,
+     body TEXT NOT NULL DEFAULT '',
+     category TEXT NOT NULL DEFAULT 'General',
+     published BOOLEAN NOT NULL DEFAULT TRUE,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );`,
 ];

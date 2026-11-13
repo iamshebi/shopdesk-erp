@@ -15,7 +15,7 @@ export default async function NewOrder({ searchParams }: { searchParams: Promise
     <div className="max-w-5xl">
       <PageHeader title={kind === "quote" ? "New quotation" : "New sales order"} subtitle={kind === "quote" ? "A price offer you can send, then turn into an order" : "For phone, WhatsApp, website or delivery orders. Stock is reserved when you confirm it."} />
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
-      <OrderForm action={saveOrder} kind={kind} reps={reps} currency={s.currency} canDiscount={can(user, "sales.discount")} defaultTerms="Prices include VAT. Valid for 7 days. Stock subject to availability." />
+      <OrderForm action={saveOrder} kind={kind} order={sp.name || sp.phone ? { customer_name: sp.name ?? "", customer_phone: sp.phone ?? "", customer_email: sp.email ?? "" } : undefined} reps={reps} currency={s.currency} canDiscount={can(user, "sales.discount")} defaultTerms="Prices include VAT. Valid for 7 days. Stock subject to availability." />
     </div>
   );
 }

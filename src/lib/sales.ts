@@ -125,6 +125,15 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
   }
 
   const customerId = await upsertCustomer(t, input.customer);
+  if (customerId && paid < total) {
+    const [c] = await t<{ credit_limit: number; name: string; owes: number }>(
+      `SELECT c.credit_limit, c.name, COALESCE((SELECT sum(${OUTSTANDING_SQL}) FROM sales s WHERE s.customer_id=c.id AND s.type='invoice'),0) owes FROM customers c WHERE c.id=$1`,
+      [customerId],
+    );
+    if (c && Number(c.credit_limit) > 0 && Number(c.owes) + (total - paid) > Number(c.credit_limit) + 0.004) {
+      throw new SaleError(`${c.name} would owe ${r2(Number(c.owes) + total - paid).toFixed(2)}, over their credit limit of ${Number(c.credit_limit).toFixed(2)}. Take more payment now.`);
+    }
+  }
   const number = await nextNumber(t, "invoice", s.invoice_prefix || "INV-");
   const [sale] = await t<{ id: number }>(
     `INSERT INTO sales (number, type, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, discount, vat, total, cost, paid, notes, repair_id, created_by)

@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
   const s = await getSettings();
   const NAV_PERMS: Record<string, string[]> = {
-    dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], accounting: ["accounting"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
+    dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], accounting: ["accounting"], crm: ["crm"], support: ["support"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
     purchases: ["purchases"], suppliers: ["suppliers"], customers: ["customers"], expenses: ["expenses"],
     reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity"],
   };
@@ -27,6 +27,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { title: "Add a product", href: "/products/new", perm: "products.edit" },
     { title: "Import products from Excel / CSV", href: "/products/import", perm: "products.import" },
     { title: "New purchase from supplier", href: "/purchases/new", perm: "purchases" },
+    { title: "Add a lead", href: "/crm?add=1", perm: "crm" },
+    { title: "Follow-ups due", href: "/crm/followups", perm: "crm" },
+    { title: "New support ticket", href: "/support?new=1", perm: "support" },
     { title: "Record an expense", href: "/expenses", perm: "expenses" },
     { title: "Day close", href: "/reports/day", perm: "reports.day" },
     { title: "VAT return report", href: "/reports/vat", perm: "reports.vat" },

@@ -4,8 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark,
-} from "lucide-react";
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
 type Item = { area: string; href: string; label: string; icon: typeof LayoutDashboard; key?: string };
@@ -22,6 +21,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { area: "orders", href: "/orders", label: "Orders & quotes", icon: ClipboardList, key: "O" },
       { area: "sales", href: "/sales", label: "Invoices", icon: Receipt, key: "I" },
       { area: "customers", href: "/customers", label: "Customers", icon: Users, key: "C" },
+      { area: "crm", href: "/crm", label: "CRM & leads", icon: Target, key: "L" },
     ],
   },
   {
@@ -36,6 +36,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
   {
     id: "service", label: "Service", items: [
       { area: "repairs", href: "/repairs", label: "Repairs", icon: Wrench, key: "R" },
+      { area: "support", href: "/support", label: "Support tickets", icon: LifeBuoy },
       { area: "buyback", href: "/buyback", label: "Buy used", icon: Recycle },
     ],
   },
