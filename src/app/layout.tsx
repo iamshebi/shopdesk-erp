@@ -15,6 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // On a cloud host (Vercel) the embedded database would be wiped on every restart,
 // so a real Postgres (DATABASE_URL) is required there.
+const THEME_SCRIPT = `try{var t=localStorage.getItem("sd-theme");if(t==="dark")document.documentElement.classList.add("dark")}catch(e){}`;
+
 const missingCloudDb = !!process.env.VERCEL && !process.env.DATABASE_URL && !process.env.POSTGRES_URL;
 
 export const viewport: Viewport = { themeColor: "#f6f7f9" };
@@ -37,7 +39,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const s = await getSettings().catch(() => null);
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply the saved light/dark theme before the page paints, so it doesn't flash. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body style={{ ["--accent" as any]: s?.accent || "#0f766e" }} className="min-h-screen font-sans">
         {children}
       </body>

@@ -71,3 +71,44 @@ html, body {
   html, body { background: white; }
   @page { margin: 10mm; }
 }
+
+.kbd {
+  @apply rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-sans text-[11px] text-slate-500;
+}
+
+/* Dark mode: remaps the colour palette, so every page follows without per-page changes. Print stays light. */
+@media screen {
+  html.dark {
+    color-scheme: dark;
+    --color-white: #131a26;
+    --color-slate-50: #0f1520;
+    --color-slate-100: #1a2230;
+    --color-slate-200: #273244;
+    --color-slate-300: #3a475c;
+    --color-slate-400: #7c8aa0;
+    --color-slate-500: #94a3b8;
+    --color-slate-600: #b6c2d2;
+    --color-slate-700: #cbd5e1;
+    --color-slate-800: #e2e8f0;
+    --color-slate-900: #f1f5f9;
+    --color-slate-950: #f8fafc;
+    --color-emerald-50: #0d2a22;
+    --color-emerald-600: #34d399;
+    --color-emerald-700: #6ee7b7;
+    --color-amber-50: #2c2210;
+    --color-amber-700: #fcd34d;
+    --color-amber-800: #fde68a;
+    --color-red-50: #2d1416;
+    --color-red-200: #5b2125;
+    --color-red-600: #f87171;
+    --color-red-700: #fca5a5;
+    --color-sky-50: #0c2233;
+    --color-sky-700: #7dd3fc;
+    --color-violet-50: #221a35;
+    --color-violet-700: #c4b5fd;
+  }
+  html.dark, html.dark body {
+    background: #0b111b;
+    color: #e2e8f0;
+  }
+}
