@@ -466,4 +466,47 @@ export const MIGRATIONS: string[] = [
      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );`,
+
+  // 8. Accounting: chart of accounts, double-entry journal, bank reconciliation
+  `CREATE TABLE IF NOT EXISTS accounts (
+     id SERIAL PRIMARY KEY,
+     code TEXT NOT NULL UNIQUE,
+     name TEXT NOT NULL,
+     type TEXT NOT NULL,
+     system_key TEXT NOT NULL DEFAULT '',
+     is_bank BOOLEAN NOT NULL DEFAULT FALSE,
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS journal_entries (
+     id SERIAL PRIMARY KEY,
+     date DATE NOT NULL,
+     number TEXT NOT NULL DEFAULT '',
+     source TEXT NOT NULL DEFAULT '',
+     memo TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE UNIQUE INDEX IF NOT EXISTS journal_source_idx ON journal_entries (source) WHERE source <> '';
+   CREATE INDEX IF NOT EXISTS journal_date_idx ON journal_entries (date);
+   CREATE TABLE IF NOT EXISTS bank_reconciliations (
+     id SERIAL PRIMARY KEY,
+     account_id INTEGER NOT NULL REFERENCES accounts(id),
+     statement_date DATE NOT NULL,
+     statement_balance NUMERIC(14,2) NOT NULL,
+     notes TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS journal_lines (
+     id SERIAL PRIMARY KEY,
+     entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+     account_id INTEGER NOT NULL REFERENCES accounts(id),
+     debit NUMERIC(14,2) NOT NULL DEFAULT 0,
+     credit NUMERIC(14,2) NOT NULL DEFAULT 0,
+     memo TEXT NOT NULL DEFAULT '',
+     reconciliation_id INTEGER REFERENCES bank_reconciliations(id) ON DELETE SET NULL
+   );
+   CREATE INDEX IF NOT EXISTS journal_lines_account_idx ON journal_lines (account_id);
+   CREATE INDEX IF NOT EXISTS journal_lines_entry_idx ON journal_lines (entry_id);`,
 ];

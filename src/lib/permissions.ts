@@ -52,6 +52,7 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
       { key: "reports", label: "Sales, profit & stock reports" },
       { key: "reports.day", label: "Day close (cash in drawer)" },
       { key: "reports.vat", label: "VAT return report" },
+      { key: "accounting", label: "Accounting: ledger, P&L, balance sheet, bank" },
     ],
   },
   {
