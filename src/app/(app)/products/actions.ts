@@ -2,45 +2,66 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { q, one, tx } from "@/lib/db";
+import { internalEan13 } from "@/lib/barcode";
+import { recordChanges } from "@/lib/product-history";
 import { requireUser, can } from "@/lib/auth";
 import { log } from "@/lib/activity";
 import { str, numf } from "@/lib/util";
 
-function productFields(fd: FormData) {
-  return [
-    str(fd, "name"),
-    str(fd, "brand"),
-    str(fd, "category"),
-    str(fd, "sku"),
-    str(fd, "barcode"),
-    numf(fd, "cost"),
-    numf(fd, "price"),
-    fd.get("track_serial") === "on",
-    fd.get("is_service") === "on",
-    Math.round(numf(fd, "reorder_level")),
-  ];
+const STATUSES = ["active", "draft", "inactive"];
+
+function cleanTags(v: string) {
+  return [...new Set(v.split(",").map((t) => t.trim()).filter(Boolean))].join(", ");
 }
+
+/** Every editable product field, read from the product form. */
+function readProduct(fd: FormData) {
+  const discount = str(fd, "discount_price");
+  return {
+    name: str(fd, "name"),
+    brand: str(fd, "brand"),
+    category: str(fd, "category"),
+    sku: str(fd, "sku"),
+    barcode: str(fd, "barcode"),
+    cost: numf(fd, "cost"),
+    price: numf(fd, "price"),
+    track_serial: fd.get("track_serial") === "on",
+    is_service: fd.get("is_service") === "on",
+    reorder_level: Math.round(numf(fd, "reorder_level")),
+    status: STATUSES.includes(str(fd, "status")) ? str(fd, "status") : "active",
+    tags: cleanTags(str(fd, "tags")),
+    description: str(fd, "description"),
+    specs: str(fd, "specs"),
+    discount_price: discount ? numf(fd, "discount_price") : null,
+    featured: fd.get("featured") === "on",
+    website_visible: fd.get("website_visible") === "on",
+    seo_title: str(fd, "seo_title"),
+    seo_description: str(fd, "seo_description"),
+  };
+}
+type ProductData = ReturnType<typeof readProduct>;
+const COLS = Object.keys(readProduct(new FormData())) as (keyof ProductData)[];
 
 export async function createProduct(fd: FormData) {
   const user = await requireUser("products.edit");
   const opening = Math.round(numf(fd, "opening_qty"));
-  const fields = productFields(fd);
-  if (!can(user, "products.cost")) fields[5] = 0;
+  const d = readProduct(fd);
+  if (!can(user, "products.cost")) d.cost = 0;
+  if (!d.name) redirect("/products/new?err=" + encodeURIComponent("Product name is required"));
   const id = await tx(async (t) => {
     const [p] = await t<{ id: number }>(
-      `INSERT INTO products (name, brand, category, sku, barcode, cost, price, track_serial, is_service, reorder_level, stock_qty)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-      [...fields, fields[7] || fields[8] ? 0 : opening],
+      `INSERT INTO products (${COLS.join(", ")}, stock_qty) VALUES (${COLS.map((_, i) => `$${i + 1}`).join(", ")}, $${COLS.length + 1}) RETURNING id`,
+      [...COLS.map((c) => d[c]), d.track_serial || d.is_service ? 0 : opening],
     );
-    if (fields[7]) {
+    if (!d.sku) await t("UPDATE products SET sku = $2 WHERE id=$1", [p.id, `P${String(p.id).padStart(5, "0")}`]);
+    if (d.track_serial) {
       const imeis = str(fd, "opening_imeis").split(/[\s,]+/).filter(Boolean);
-      for (const imei of imeis) {
-        await t("INSERT INTO units (product_id, imei, cost, source) VALUES ($1, $2, $3, 'opening')", [p.id, imei, fields[5]]);
-      }
+      for (const imei of imeis) await t("INSERT INTO units (product_id, imei, cost, source) VALUES ($1, $2, $3, 'opening')", [p.id, imei, d.cost]);
     }
+    await t("INSERT INTO product_history (product_id, user_id, field, new_value, source) VALUES ($1,$2,'Created',$3,'create')", [p.id, user.id, d.name]);
     return p.id;
   });
-  await log(user.id, "Product added", String(fields[0]), `/products/${id}`);
+  await log(user.id, "Product added", d.name, `/products/${id}`);
   revalidatePath("/products");
   redirect(`/products/${id}`);
 }
@@ -48,19 +69,16 @@ export async function createProduct(fd: FormData) {
 export async function updateProduct(fd: FormData) {
   const user = await requireUser("products.edit");
   const id = Number(fd.get("id"));
-  const before = await one<any>("SELECT name, price, cost FROM products WHERE id=$1", [id]);
-  const fields = productFields(fd);
-  if (!can(user, "products.cost") && before) fields[5] = before.cost;
-  await q(
-    `UPDATE products SET name=$1, brand=$2, category=$3, sku=$4, barcode=$5, cost=$6, price=$7, track_serial=$8, is_service=$9, reorder_level=$10
-     WHERE id=$11`,
-    [...fields, id],
-  );
-  if (before && Number(before.price) !== fields[6]) {
-    await log(user.id, "Price changed", `${before.name}: ${before.price} → ${fields[6]}`, `/products/${id}`);
-  } else {
-    await log(user.id, "Product edited", String(fields[0]), `/products/${id}`);
-  }
+  const before = await one<any>(`SELECT ${COLS.join(", ")} FROM products WHERE id=$1`, [id]);
+  if (!before) redirect("/products");
+  const d = readProduct(fd);
+  if (!can(user, "products.cost")) d.cost = before.cost;
+  const changed = await tx(async (t) => {
+    await t(`UPDATE products SET ${COLS.map((c, i) => `${c}=$${i + 1}`).join(", ")}, updated_at=now() WHERE id=$${COLS.length + 1}`, [...COLS.map((c) => d[c]), id]);
+    return recordChanges(t, id, user.id, before, d);
+  });
+  if (Number(before.price) !== d.price) await log(user.id, "Price changed", `${before.name}: ${before.price} → ${d.price}`, `/products/${id}`);
+  else if (changed.length) await log(user.id, "Product edited", `${d.name}: ${changed.join(", ")}`, `/products/${id}`);
   revalidatePath(`/products/${id}`);
   redirect(`/products/${id}?saved=1`);
 }
@@ -68,16 +86,98 @@ export async function updateProduct(fd: FormData) {
 export async function toggleProduct(fd: FormData) {
   const user = await requireUser("products.edit");
   const id = Number(fd.get("id"));
-  const r = await one<any>("UPDATE products SET active = NOT active WHERE id=$1 RETURNING name, active", [id]);
-  if (r) await log(user.id, r.active ? "Product restored" : "Product archived", r.name, `/products/${id}`);
+  const r = await one<any>("UPDATE products SET active = NOT active, updated_at=now() WHERE id=$1 RETURNING name, active", [id]);
+  if (r) {
+    await q("INSERT INTO product_history (product_id, user_id, field, old_value, new_value) VALUES ($1,$2,'Archived',$3,$4)", [id, user.id, r.active ? "yes" : "no", r.active ? "no" : "yes"]);
+    await log(user.id, r.active ? "Product restored" : "Product archived", r.name, `/products/${id}`);
+  }
   revalidatePath(`/products/${id}`);
+}
+
+export async function duplicateProduct(fd: FormData) {
+  const user = await requireUser("products.edit");
+  const id = Number(fd.get("id"));
+  const newId = await tx(async (t) => {
+    const keep = COLS.filter((c) => !["sku", "barcode"].includes(c));
+    const [p] = await t<{ id: number; name: string }>(
+      `INSERT INTO products (${keep.join(", ")}, stock_qty) SELECT ${keep.map((c) => (c === "name" ? "name || ' (copy)'" : c === "status" ? "'draft'" : c)).join(", ")}, 0 FROM products WHERE id=$1 RETURNING id, name`,
+      [id],
+    );
+    await t("UPDATE products SET sku = $2 WHERE id=$1", [p.id, `P${String(p.id).padStart(5, "0")}`]);
+    await t("INSERT INTO product_history (product_id, user_id, field, new_value, source) VALUES ($1,$2,'Created',$3,'duplicate')", [p.id, user.id, `Copy of product #${id}`]);
+    return p.id;
+  });
+  await log(user.id, "Product duplicated", `#${id} → #${newId}`, `/products/${newId}`);
+  redirect(`/products/${newId}?saved=1&dup=1`);
+}
+
+export async function generateBarcode(fd: FormData) {
+  const user = await requireUser("products.edit");
+  const id = Number(fd.get("id"));
+  const code = internalEan13(id);
+  const r = await one<{ barcode: string }>("SELECT barcode FROM products WHERE id=$1", [id]);
+  await q("UPDATE products SET barcode=$2, updated_at=now() WHERE id=$1", [id, code]);
+  await q("INSERT INTO product_history (product_id, user_id, field, old_value, new_value) VALUES ($1,$2,'Barcode',$3,$4)", [id, user.id, r?.barcode ?? "", code]);
+  revalidatePath(`/products/${id}`);
+  redirect(`/products/${id}?saved=1`);
+}
+
+/** Apply one change to many products at once (from the bulk toolbar on the products list). */
+export async function bulkProducts(fd: FormData) {
+  const op = str(fd, "op");
+  const ids = fd.getAll("ids").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const back = str(fd, "back") || "/products";
+  const done = (msg: string): never => redirect(`${back}${back.includes("?") ? "&" : "?"}ok=${encodeURIComponent(msg)}`);
+  if (!ids.length) done("Select at least one product first");
+  if (op === "labels") redirect(`/print/labels?ids=${ids.join(",")}&copies=${Math.max(1, Math.min(50, Math.round(numf(fd, "copies")) || 1))}`);
+  if (op === "export") redirect(`/api/export/products?ids=${ids.join(",")}`);
+  const user = await requireUser(op === "archive" ? "products.edit" : "products.edit");
+  const rows = await q<any>(`SELECT id, name, ${COLS.join(", ")}, active FROM products WHERE id = ANY($1::int[])`, [ids]);
+  let summary = "";
+  await tx(async (t) => {
+    for (const p of rows) {
+      const after: Record<string, any> = {};
+      if (op === "status") after.status = STATUSES.includes(str(fd, "status")) ? str(fd, "status") : p.status;
+      else if (op === "category") after.category = str(fd, "category");
+      else if (op === "brand") after.brand = str(fd, "brand");
+      else if (op === "tag_add") after.tags = cleanTags(`${p.tags}, ${str(fd, "tag")}`);
+      else if (op === "tag_remove") after.tags = cleanTags(p.tags.split(",").filter((x: string) => x.trim().toLowerCase() !== str(fd, "tag").toLowerCase()).join(","));
+      else if (op === "website") after.website_visible = str(fd, "website") === "show";
+      else if (op === "archive") after.active = false;
+      else if (op === "price") {
+        const mode = str(fd, "mode"), v = numf(fd, "value"), round = str(fd, "round");
+        let price = Number(p.price);
+        if (mode === "percent") price = price * (1 + v / 100);
+        else if (mode === "amount") price = price + v;
+        else if (mode === "set") price = v;
+        else if (mode === "margin") price = Number(p.cost) * (1 + v / 100);
+        if (round === "whole") price = Math.round(price);
+        else if (round === "99") price = Math.max(0, Math.ceil(price) - 0.01);
+        else if (round === "5") price = Math.round(price / 5) * 5;
+        after.price = Math.max(0, Math.round(price * 100) / 100);
+      } else continue;
+      const sets = Object.keys(after);
+      await t(`UPDATE products SET ${sets.map((k, i) => `${k}=$${i + 2}`).join(", ")}, updated_at=now() WHERE id=$1`, [p.id, ...sets.map((k) => after[k])]);
+      await recordChanges(t, p.id, user.id, p, after, "bulk");
+    }
+  });
+  const what: Record<string, string> = {
+    status: `Status set to ${str(fd, "status")}`, category: `Category set to “${str(fd, "category")}”`, brand: `Brand set to “${str(fd, "brand")}”`,
+    tag_add: `Tag “${str(fd, "tag")}” added`, tag_remove: `Tag “${str(fd, "tag")}” removed`, price: "Prices updated", archive: "Archived",
+    website: str(fd, "website") === "show" ? "Shown on website" : "Hidden from website",
+  };
+  summary = `${what[op] ?? "Updated"} for ${rows.length} product${rows.length === 1 ? "" : "s"}`;
+  await log(user.id, op === "price" ? "Bulk price change" : "Bulk product edit", summary, "/products");
+  revalidatePath("/products");
+  done(summary);
 }
 
 export async function adjustStock(fd: FormData) {
   const user = await requireUser("stock.adjust");
   const id = Number(fd.get("id"));
   const delta = Math.round(numf(fd, "delta"));
-  const r = await one<any>("UPDATE products SET stock_qty = stock_qty + $1 WHERE id=$2 RETURNING name, stock_qty", [delta, id]);
+  const r = await one<any>("UPDATE products SET stock_qty = stock_qty + $1, updated_at=now() WHERE id=$2 RETURNING name, stock_qty", [delta, id]);
+  if (r) await q("INSERT INTO product_history (product_id, user_id, field, old_value, new_value, source) VALUES ($1,$2,'Stock',$3,$4,'adjust')", [id, user.id, String(r.stock_qty - delta), String(r.stock_qty)]);
   if (r) await log(user.id, "Stock adjusted", `${r.name}: ${delta > 0 ? "+" : ""}${delta} (now ${r.stock_qty})`, `/products/${id}`);
   revalidatePath(`/products/${id}`);
 }

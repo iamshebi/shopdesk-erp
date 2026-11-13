@@ -298,4 +298,28 @@ export const MIGRATIONS: string[] = [
    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ;`,
+
+  // 4. Products v2: status, tags, description, website and SEO fields, change history
+  `ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT '';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS specs TEXT NOT NULL DEFAULT '';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_price NUMERIC(12,2);
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE;
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS website_visible BOOLEAN NOT NULL DEFAULT TRUE;
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS seo_title TEXT NOT NULL DEFAULT '';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS seo_description TEXT NOT NULL DEFAULT '';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+   CREATE INDEX IF NOT EXISTS products_status_idx ON products (status);
+   CREATE TABLE IF NOT EXISTS product_history (
+     id SERIAL PRIMARY KEY,
+     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     field TEXT NOT NULL,
+     old_value TEXT NOT NULL DEFAULT '',
+     new_value TEXT NOT NULL DEFAULT '',
+     source TEXT NOT NULL DEFAULT 'edit',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS product_history_idx ON product_history (product_id, created_at DESC);`,
 ];

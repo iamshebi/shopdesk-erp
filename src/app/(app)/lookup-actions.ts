@@ -23,7 +23,7 @@ export async function searchProducts(term: string): Promise<ProductHit[]> {
   const t = term.trim();
   if (!t) {
     return q<ProductHit>(`SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, ${STOCK_SQL} AS stock
-      FROM products p WHERE p.active ORDER BY p.created_at DESC LIMIT 12`);
+      FROM products p WHERE p.active AND p.status = 'active' ORDER BY p.created_at DESC LIMIT 12`);
   }
   // Exact IMEI scan -> return that product with the unit pre-selected.
   const unit = await q<any>(
@@ -40,7 +40,7 @@ export async function searchProducts(term: string): Promise<ProductHit[]> {
   const rows = await q<ProductHit>(
     `SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, ${STOCK_SQL} AS stock
      FROM products p
-     WHERE p.active AND (p.barcode = $1 OR p.sku = $1 OR (${conds.join(" AND ") || "false"}) ${unit[0] ? `OR p.id = ${Number(unit[0].product_id)}` : ""})
+     WHERE p.active AND p.status = 'active' AND (p.barcode = $1 OR p.sku = $1 OR (${conds.join(" AND ") || "false"}) ${unit[0] ? `OR p.id = ${Number(unit[0].product_id)}` : ""})
      ORDER BY (p.barcode = $1 OR p.sku = $1) DESC, p.name LIMIT 20`,
     params,
   );

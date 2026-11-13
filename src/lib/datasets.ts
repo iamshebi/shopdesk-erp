@@ -6,7 +6,9 @@ export const DATASETS: Record<string, { label: string; sql: string; dated?: stri
     label: "Products & stock",
     sql: `SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.cost, p.price,
             CASE WHEN p.track_serial THEN (SELECT count(*)::int FROM units u WHERE u.product_id=p.id AND u.status='in_stock') ELSE p.stock_qty END AS qty,
-            CASE WHEN p.track_serial THEN 'yes' ELSE 'no' END AS serial, p.reorder_level, CASE WHEN p.active THEN 'yes' ELSE 'no' END AS active
+            CASE WHEN p.track_serial THEN 'yes' ELSE 'no' END AS serial, p.reorder_level, CASE WHEN p.active THEN 'yes' ELSE 'no' END AS active,
+            p.status, p.tags, p.discount_price, CASE WHEN p.featured THEN 'yes' ELSE 'no' END AS featured,
+            CASE WHEN p.website_visible THEN 'yes' ELSE 'no' END AS on_website, p.description, p.specs, p.seo_title, p.seo_description
           FROM products p ORDER BY p.category, p.name`,
   },
   imeis: {
@@ -69,5 +71,5 @@ export const DATASETS: Record<string, { label: string; sql: string; dated?: stri
 // Tables in dependency order, for full backup / restore.
 export const BACKUP_TABLES = [
   "settings", "counters", "roles", "users", "products", "suppliers", "customers", "purchases", "purchase_items", "buybacks",
-  "sales", "units", "sale_items", "payments", "repairs", "repair_logs", "expenses", "supplier_payments", "activity", "login_events",
+  "sales", "units", "sale_items", "payments", "repairs", "repair_logs", "expenses", "supplier_payments", "activity", "login_events", "product_history",
 ];

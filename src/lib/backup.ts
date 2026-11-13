@@ -2,6 +2,7 @@ import "server-only";
 import { q, tx } from "./db";
 import { BACKUP_TABLES } from "./datasets";
 import { decryptField } from "./totp";
+import { DEFAULT_ROLES } from "./permissions";
 
 export async function makeBackup() {
   const tables: Record<string, unknown[]> = {};
@@ -39,4 +40,16 @@ export async function restoreBackup(data: any) {
       await q("UPDATE users SET totp_enabled=FALSE, totp_secret='' WHERE id=$1", [u.id]);
     }
   }
+}
+
+/** Factory reset: deletes every record and setting so the setup screen appears again. Keeps the signing key. */
+export async function resetAllData() {
+  await tx(async (t) => {
+    await t(`TRUNCATE ${[...BACKUP_TABLES.filter((x) => x !== "settings"), "sessions"].join(", ")} RESTART IDENTITY CASCADE`);
+    await t("DELETE FROM settings WHERE key <> 'session_secret'");
+    // Put the standard roles back so the new owner account gets the Owner role.
+    for (const r of DEFAULT_ROLES) {
+      await t("INSERT INTO roles (name, permissions, locked) VALUES ($1, $2, $3)", [r.name, JSON.stringify(r.perms), !!r.locked]);
+    }
+  });
 }

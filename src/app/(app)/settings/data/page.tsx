@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/ui";
 import SettingsTabs from "@/components/settings-tabs";
 import ImportForm from "../../products/import/form";
 import RestoreForm from "./restore-form";
+import ResetForm from "./reset-form";
+import { getSettings } from "@/lib/settings";
 import { Download, FileSpreadsheet, FileText, DatabaseBackup } from "lucide-react";
 
 export default async function DataPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
@@ -66,6 +68,17 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
           {owner ? <RestoreForm /> : <p className="text-sm text-slate-400">Ask the owner to do this.</p>}
         </div>
       </section>
+
+      {owner && (
+        <section className="card mt-6 border-red-200 p-6">
+          <h2 className="font-semibold text-red-700">Start fresh (factory reset)</h2>
+          <p className="mb-4 mt-1 text-sm text-slate-500">
+            Permanently deletes <b>all</b> products, stock, invoices, customers, repairs, staff logins and settings, then shows the setup screen.
+            It cannot be undone. Download a backup first if you might need anything.
+          </p>
+          <ResetForm shopName={(await getSettings()).shop_name} />
+        </section>
+      )}
     </div>
   );
 }

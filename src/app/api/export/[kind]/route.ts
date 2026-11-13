@@ -14,8 +14,8 @@ function cell(v: unknown) {
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ kind: string }> }) {
-  const user = await requireUser("data");
   const { kind } = await params;
+  const user = await requireUser(kind === "products" ? ["data", "products.edit"] : "data");
   const ds = DATASETS[kind];
   if (!ds) return new Response("Unknown export", { status: 404 });
   const url = new URL(req.url);
@@ -23,7 +23,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   const to = url.searchParams.get("to") || "2999-12-31";
   const format = url.searchParams.get("format") === "csv" ? "csv" : "xlsx";
   const sql = ds.sql.replace("{{date}}", ds.dated ? `(${ds.dated} AT TIME ZONE 'Asia/Dubai')::date BETWEEN $1 AND $2` : "TRUE");
-  const rows = await q<Record<string, unknown>>(sql, ds.dated ? [from, to] : []);
+  const ids = (url.searchParams.get("ids") || "").split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const args: unknown[] = ds.dated ? [from, to] : [];
+  const finalSql = ids.length && kind === "products" ? `SELECT * FROM (${sql}) x WHERE x.id = ANY($${args.push(ids)}::int[])` : sql;
+  const rows = await q<Record<string, unknown>>(finalSql, args);
   const s = await getSettings();
   const cols = rows[0] ? Object.keys(rows[0]) : [];
   const base = `${s.shop_name.replace(/[^\w]+/g, "-")}-${kind}-${new Date().toISOString().slice(0, 10)}`;

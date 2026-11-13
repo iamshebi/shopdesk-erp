@@ -7,7 +7,10 @@ import { fmtDate, num } from "@/lib/util";
 import { PageHeader, Badge, Empty } from "@/components/ui";
 import ProductForm from "@/components/product-form";
 import Submit from "@/components/submit";
-import { updateProduct, toggleProduct, adjustStock, addUnits, writeOffUnit } from "../actions";
+import { updateProduct, toggleProduct, adjustStock, addUnits, writeOffUnit, duplicateProduct, generateBarcode } from "../actions";
+import { Copy, Tag, Barcode } from "lucide-react";
+
+const STATUS_TONE: Record<string, string> = { active: "green", draft: "amber", inactive: "slate" };
 
 const UNIT_TONE: Record<string, string> = { in_stock: "green", sold: "slate", written_off: "red", returned: "amber" };
 
@@ -32,20 +35,26 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
      FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id=$1`,
     [p.id],
   );
+  const history = await q<any>("SELECT h.*, u.name FROM product_history h LEFT JOIN users u ON u.id=h.user_id WHERE h.product_id=$1 ORDER BY h.id DESC LIMIT 100", [p.id]);
   const canAdjust = can(user, "stock.adjust");
   const showCost = can(user, "products.cost");
   const canEdit = can(user, "products.edit");
   return (
     <div className="max-w-5xl">
-      <PageHeader title={p.name} subtitle={`${p.brand || "No brand"} · ${p.category || "Uncategorised"}${p.active ? "" : " · archived"}`}>
-        {can(user, "pos") && <Link href={`/pos?add=${p.id}`} className="btn-primary">Sell</Link>}
+      <PageHeader title={p.name} subtitle={`${p.brand || "No brand"} · ${p.category || "Uncategorised"}${p.sku ? ` · ${p.sku}` : ""}${p.active ? "" : " · archived"}`}>
+        <Badge tone={STATUS_TONE[p.status] ?? "slate"}>{p.status}</Badge>
+        {can(user, "pos") && p.status === "active" && <Link href={`/pos?add=${p.id}`} className="btn-primary">Sell</Link>}
+        <Link href={`/print/labels?ids=${p.id}`} target="_blank" className="btn-ghost"><Tag size={16} /> Label</Link>
+        {canEdit && !p.barcode && <form action={generateBarcode}><input type="hidden" name="id" value={p.id} /><Submit className="btn-ghost"><Barcode size={16} /> Make barcode</Submit></form>}
+        {canEdit && <form action={duplicateProduct}><input type="hidden" name="id" value={p.id} /><Submit className="btn-ghost"><Copy size={16} /> Duplicate</Submit></form>}
         {canEdit && <form action={toggleProduct}>
           <input type="hidden" name="id" value={p.id} />
           <Submit className="btn-ghost">{p.active ? "Archive" : "Restore"}</Submit>
         </form>}
       </PageHeader>
-      {sp.saved && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">Saved.</div>}
+      {sp.saved && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.dup ? "Copy created as a draft. Check the name, SKU and barcode, then set it to Active." : "Saved."}</div>}
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
+      {p.tags && <div className="mb-4 flex flex-wrap gap-1.5">{p.tags.split(",").map((t: string) => <Link key={t} href={`/products?tag=${encodeURIComponent(t.trim())}`}><Badge tone="blue">{t.trim()}</Badge></Link>)}</div>}
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <div className="card p-5"><div className="text-xs text-slate-500">In stock</div><div className="mt-1 text-2xl font-semibold">{p.is_service ? "—" : p.stock}</div></div>
         <div className="card p-5"><div className="text-xs text-slate-500">Units sold (all time)</div><div className="mt-1 text-2xl font-semibold">{sold?.qty ?? 0}</div></div>
@@ -120,6 +129,25 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           )}
         </div>
       )}
+      <div className="card mt-6 overflow-x-auto">
+        <div className="p-5 pb-2 font-semibold">Change history</div>
+        {history.length === 0 ? <Empty>No changes recorded yet.</Empty> : (
+          <table className="tbl">
+            <thead><tr><th>When</th><th>Staff</th><th>What changed</th><th>From</th><th>To</th></tr></thead>
+            <tbody>
+              {history.map((h) => (h.field === "Cost" && !showCost ? null : (
+                <tr key={h.id}>
+                  <td className="whitespace-nowrap text-slate-500">{fmtDate(h.created_at, true)}</td>
+                  <td className="whitespace-nowrap">{h.name ?? "—"}</td>
+                  <td className="whitespace-nowrap font-medium">{h.field}{h.source !== "edit" && <span className="ml-1 text-xs font-normal text-slate-400">({h.source})</span>}</td>
+                  <td className="max-w-[16rem] truncate text-slate-500">{h.old_value || "—"}</td>
+                  <td className="max-w-[16rem] truncate">{h.new_value || "—"}</td>
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
