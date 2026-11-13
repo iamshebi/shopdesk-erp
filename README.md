@@ -47,6 +47,18 @@ The first launch shows a Windows SmartScreen warning ("unknown publisher") until
 click *More info → Run anyway*. Windows Firewall will ask to allow network access — allow it on private networks
 so other counters can connect.
 
+## Samsung DeX, tablets and phones
+
+ShopDesk is a web app, so on Samsung DeX it runs in Chrome or Samsung Internet. Two ways:
+
+* **Cloud (works anywhere):** deploy to Vercel with a Postgres database (see *Set up a new shop* below), open the
+  site on DeX and choose **⋮ → Add to Home screen** (Chrome) or **Add page to → Apps screen** (Samsung Internet).
+  It then opens in its own resizable window with its own icon, like a desktop app.
+* **Shop Wi-Fi (offline, no cloud):** run the Windows app on the shop PC, open **File → Use on other devices**
+  and type that address (e.g. `http://192.168.1.20:4300`) into Chrome on DeX. Same data as the PC.
+
+On Windows the cloud version can also be installed from Chrome or Edge (**Install app** icon in the address bar).
+
 ## Run locally
 
 ```bash

@@ -85,7 +85,8 @@ async function makePglite(): Promise<Driver> {
 }
 
 async function init(): Promise<Driver> {
-  const url = process.env.DATABASE_URL;
+  // DATABASE_URL (Neon / any Postgres) or POSTGRES_URL (set by the Vercel Supabase integration)
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
   const d = url ? await makePg(url) : await makePglite();
   await d.setup([BASE_SCHEMA, ...MIGRATIONS]);
   return d;

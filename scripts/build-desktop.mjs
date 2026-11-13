@@ -52,8 +52,12 @@ const config = {
   executableName: brand.executableName,
   electronVersion,
   directories: { app: appDir, output: path.join(root, "release", brandName) },
-  extraResources: [{ from: server, to: "server" }],
+  // electron-builder always drops a node_modules folder at the root of "from", so copy the parent
+  // folder and pick server/** — the server's node_modules (Next, PGlite, pg...) then gets included.
+  extraResources: [{ from: out, to: ".", filter: ["server/**/*"] }],
   asar: true,
+  // No auto-update feed: installers are handed to each shop directly.
+  publish: null,
   win: { target: [{ target: "nsis", arch: ["x64"] }], icon: path.join(brandDir, "icon.png") },
   nsis: {
     oneClick: false,
