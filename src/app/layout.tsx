@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
+import { maybeFactoryReset } from "@/lib/backup";
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings().catch(() => null);
@@ -22,6 +23,7 @@ const missingCloudDb = !!process.env.VERCEL && !process.env.DATABASE_URL && !pro
 export const viewport: Viewport = { themeColor: "#f6f7f9" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  if (!missingCloudDb) await maybeFactoryReset().catch((e) => console.error("factory reset failed", e));
   if (missingCloudDb) {
     return (
       <html lang="en">

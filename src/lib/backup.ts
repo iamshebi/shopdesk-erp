@@ -46,10 +46,32 @@ export async function restoreBackup(data: any) {
 export async function resetAllData() {
   await tx(async (t) => {
     await t(`TRUNCATE ${[...BACKUP_TABLES.filter((x) => x !== "settings"), "sessions"].join(", ")} RESTART IDENTITY CASCADE`);
-    await t("DELETE FROM settings WHERE key <> 'session_secret'");
+    await t("DELETE FROM settings WHERE key NOT IN ('session_secret', 'factory_reset_done')");
     // Put the standard roles back so the new owner account gets the Owner role.
     for (const r of DEFAULT_ROLES) {
       await t("INSERT INTO roles (name, permissions, locked) VALUES ($1, $2, $3)", [r.name, JSON.stringify(r.perms), !!r.locked]);
     }
   });
+}
+
+let resetChecked = false;
+
+/**
+ * One-time reset switched on from the hosting side: set SHOPDESK_FACTORY_RESET to a new value and deploy.
+ * Runs once per value (remembered in settings), keeps a snapshot of the old data in reset_snapshots first.
+ */
+export async function maybeFactoryReset() {
+  const token = process.env.SHOPDESK_FACTORY_RESET;
+  if (!token || resetChecked) return;
+  resetChecked = true;
+  await q("CREATE TABLE IF NOT EXISTS reset_snapshots (id SERIAL PRIMARY KEY, token TEXT NOT NULL, data TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())");
+  const claimed = await q<{ key: string }>(
+    `INSERT INTO settings (key, value) VALUES ('factory_reset_done', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value WHERE settings.value <> EXCLUDED.value RETURNING key`,
+    [token],
+  );
+  if (!claimed.length) return; // already done for this value
+  await q("INSERT INTO reset_snapshots (token, data) VALUES ($1, $2)", [token, JSON.stringify(await makeBackup())]);
+  await resetAllData();
+  console.warn(`Factory reset done (switch value ${token.slice(0, 4)}…); old data kept in reset_snapshots`);
 }
