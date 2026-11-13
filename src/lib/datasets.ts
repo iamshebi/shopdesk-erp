@@ -76,4 +76,5 @@ export const BACKUP_TABLES = [
   "orders", "order_items", "order_events", "website_publishes",
   "accounts", "journal_entries", "bank_reconciliations", "journal_lines",
   "leads", "crm_activities", "tickets", "ticket_messages", "kb_articles",
+  "departments", "employees", "attendance", "leave_requests", "payroll_runs", "payslips", "projects", "tasks", "task_comments",
 ];

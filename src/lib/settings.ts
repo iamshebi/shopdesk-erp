@@ -28,6 +28,8 @@ export interface ShopSettings {
   website_path: string;
   website_token_enc: string; // GitHub token, encrypted
   website_show_prices: boolean;
+  wps_employer_id: string;
+  wps_bank_routing: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -56,6 +58,8 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   website_path: "catalog.json",
   website_token_enc: "",
   website_show_prices: false,
+  wps_employer_id: "",
+  wps_bank_routing: "",
 };
 
 export const getSettings = cache(async (): Promise<ShopSettings> => {

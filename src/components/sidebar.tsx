@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy } from "lucide-react";
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
 type Item = { area: string; href: string; label: string; icon: typeof LayoutDashboard; key?: string };
@@ -47,6 +47,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { area: "reports", href: "/reports", label: "Reports", icon: BarChart3 },
     ],
   },
+  { id: "team", label: "Team", items: [{ area: "hr", href: "/hr", label: "HR & payroll", icon: IdCard }, { area: "tasks", href: "/tasks", label: "Tasks & projects", icon: KanbanSquare, key: "T" }] },
   { id: "admin", label: "Administration", items: [{ area: "website", href: "/website", label: "Website", icon: Globe }, { area: "settings", href: "/settings", label: "Settings", icon: Settings }] },
 ];
 

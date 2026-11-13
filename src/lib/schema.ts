@@ -582,4 +582,106 @@ export const MIGRATIONS: string[] = [
      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );`,
+
+  // 10. HR (departments, employees, attendance, leave, payroll) and tasks / projects
+  `CREATE TABLE IF NOT EXISTS departments (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+   CREATE TABLE IF NOT EXISTS employees (
+     id SERIAL PRIMARY KEY,
+     code TEXT NOT NULL UNIQUE,
+     name TEXT NOT NULL,
+     phone TEXT NOT NULL DEFAULT '',
+     email TEXT NOT NULL DEFAULT '',
+     designation TEXT NOT NULL DEFAULT '',
+     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     join_date DATE,
+     basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0,
+     allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
+     annual_leave_days NUMERIC(5,1) NOT NULL DEFAULT 30,
+     labour_card_no TEXT NOT NULL DEFAULT '',
+     bank_routing TEXT NOT NULL DEFAULT '',
+     iban TEXT NOT NULL DEFAULT '',
+     active BOOLEAN NOT NULL DEFAULT TRUE,
+     notes TEXT NOT NULL DEFAULT '',
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS attendance (
+     id SERIAL PRIMARY KEY,
+     employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+     date DATE NOT NULL,
+     status TEXT NOT NULL DEFAULT 'present',
+     check_in TEXT NOT NULL DEFAULT '',
+     check_out TEXT NOT NULL DEFAULT '',
+     overtime_hours NUMERIC(5,2) NOT NULL DEFAULT 0,
+     note TEXT NOT NULL DEFAULT '',
+     UNIQUE (employee_id, date)
+   );
+   CREATE TABLE IF NOT EXISTS leave_requests (
+     id SERIAL PRIMARY KEY,
+     employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+     type TEXT NOT NULL DEFAULT 'annual',
+     from_date DATE NOT NULL,
+     to_date DATE NOT NULL,
+     days NUMERIC(5,1) NOT NULL DEFAULT 1,
+     reason TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL DEFAULT 'pending',
+     decided_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS payroll_runs (
+     id SERIAL PRIMARY KEY,
+     month TEXT NOT NULL UNIQUE,
+     status TEXT NOT NULL DEFAULT 'draft',
+     method TEXT NOT NULL DEFAULT 'bank',
+     paid_date DATE,
+     total NUMERIC(12,2) NOT NULL DEFAULT 0,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS payslips (
+     id SERIAL PRIMARY KEY,
+     run_id INTEGER NOT NULL REFERENCES payroll_runs(id) ON DELETE CASCADE,
+     employee_id INTEGER NOT NULL REFERENCES employees(id),
+     days_paid NUMERIC(5,1) NOT NULL DEFAULT 30,
+     unpaid_days NUMERIC(5,1) NOT NULL DEFAULT 0,
+     basic NUMERIC(12,2) NOT NULL DEFAULT 0,
+     allowances NUMERIC(12,2) NOT NULL DEFAULT 0,
+     overtime NUMERIC(12,2) NOT NULL DEFAULT 0,
+     bonus NUMERIC(12,2) NOT NULL DEFAULT 0,
+     deductions NUMERIC(12,2) NOT NULL DEFAULT 0,
+     net NUMERIC(12,2) NOT NULL DEFAULT 0,
+     note TEXT NOT NULL DEFAULT '',
+     UNIQUE (run_id, employee_id)
+   );
+   CREATE TABLE IF NOT EXISTS projects (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     description TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL DEFAULT 'active',
+     due_date DATE,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS tasks (
+     id SERIAL PRIMARY KEY,
+     title TEXT NOT NULL,
+     description TEXT NOT NULL DEFAULT '',
+     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+     assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     status TEXT NOT NULL DEFAULT 'todo',
+     priority TEXT NOT NULL DEFAULT 'normal',
+     due_date DATE,
+     link TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     done_at TIMESTAMPTZ
+   );
+   CREATE TABLE IF NOT EXISTS task_comments (
+     id SERIAL PRIMARY KEY,
+     task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+     body TEXT NOT NULL,
+     user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );`,
 ];

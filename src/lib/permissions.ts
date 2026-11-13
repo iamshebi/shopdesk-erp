@@ -22,6 +22,9 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
       { key: "customers", label: "View & edit customers" },
       { key: "crm", label: "CRM: leads, follow-ups, customer groups" },
       { key: "support", label: "Support tickets & knowledge base" },
+      { key: "hr", label: "HR: employees, attendance, leave" },
+      { key: "payroll", label: "Payroll & salaries" },
+      { key: "tasks", label: "Tasks & projects" },
     ],
   },
   {

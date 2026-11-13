@@ -124,6 +124,12 @@ async function sync(): Promise<number> {
       await post(t, e.d, `EXP-${e.id}`, `expense:${e.id}`, `${e.category}: ${e.description}`, [[acc, Number(e.amount), 0], [A.vat_in, Number(e.vat), 0], [A[METHOD_KEY[e.method] ?? "cash"], 0, Number(e.total)]]);
       n++;
     }
+    // Salaries (paid payroll runs)
+    for (const r of await t<any>(`SELECT r.*, to_char(COALESCE(r.paid_date, now()::date),'YYYY-MM-DD') d FROM payroll_runs r WHERE r.status='paid' AND r.total > 0 AND ${missing("payroll", "r")} ORDER BY r.id`)) {
+      const acc = await expenseAccount(t, "Salaries & wages");
+      await post(t, r.d, `PAY-${r.month}`, `payroll:${r.id}`, `Salaries ${r.month}`, [[acc, Number(r.total), 0], [A[METHOD_KEY[r.method] ?? "bank"], 0, Number(r.total)]]);
+      n++;
+    }
     // Used devices bought from customers
     for (const b of await t<any>(`SELECT b.*, ${DUBAI("b.created_at")} d FROM buybacks b WHERE ${missing("buyback", "b")} ORDER BY b.id`)) {
       await post(t, b.d, b.number, `buyback:${b.id}`, `Bought used device ${b.number}`, [[A.inventory, Number(b.price_paid), 0], [A[METHOD_KEY[b.payment_method] ?? "cash"], 0, Number(b.price_paid)]]);
