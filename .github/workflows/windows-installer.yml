@@ -6,7 +6,7 @@ on:
       brand:
         description: "Brand folder in brands/ (e.g. default, zaitoon)"
         required: true
-        default: default
+        default: zaitoon
   push:
     tags: ["v*"]
 
@@ -20,9 +20,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
+      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'zaitoon' }} --pack
       - uses: actions/upload-artifact@v4
         with:
-          name: installer-${{ github.event.inputs.brand || 'default' }}
+          name: installer-${{ github.event.inputs.brand || 'zaitoon' }}
           path: release/*/*.exe
           if-no-files-found: error
