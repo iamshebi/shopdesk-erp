@@ -4,7 +4,7 @@ export function PageHeader(props: { title: string; subtitle?: string; children?:
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3 fade-in">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{props.title}</h1>
+        <h1 className="text-[1.65rem] font-semibold tracking-tight text-slate-900">{props.title}</h1>
         {props.subtitle && <p className="mt-1 text-sm text-slate-500">{props.subtitle}</p>}
       </div>
       {props.children && <div className="flex flex-wrap gap-2">{props.children}</div>}
@@ -14,7 +14,7 @@ export function PageHeader(props: { title: string; subtitle?: string; children?:
 
 export function Stat(props: { label: string; value: string; hint?: string; href?: string }) {
   const inner = (
-    <div className="card h-full p-5 transition hover:shadow-md">
+    <div className="card card-hover h-full p-5">
       <div className="text-xs font-medium text-slate-500">{props.label}</div>
       <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{props.value}</div>
       {props.hint && <div className="mt-1 text-xs text-slate-400">{props.hint}</div>}

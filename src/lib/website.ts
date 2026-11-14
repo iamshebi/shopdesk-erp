@@ -2,7 +2,7 @@ import "server-only";
 import { getSettings } from "./settings";
 import { decryptField } from "./totp";
 
-// Connection to a website whose products live in a JSON catalogue on GitHub (the Zaitoon Mobiles format).
+// Connection to a website whose products live in a JSON catalogue on GitHub.
 // The ERP is the source for products it is linked to; products that exist only on the website are left alone.
 
 export interface WebProduct { id: string; c: number; b?: string; n: string; d?: string; i?: string; st?: "out" | "soon"; pr?: number; h?: number; [k: string]: unknown }

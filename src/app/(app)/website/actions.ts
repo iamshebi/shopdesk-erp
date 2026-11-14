@@ -18,7 +18,7 @@ function back(msg: string, kind: "ok" | "err" = "ok", extra = ""): never {
 export async function saveConnection(fd: FormData) {
   const user = await requireUser("website");
   const repo = str(fd, "website_repo").replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
-  if (repo && !/^[\w.-]+\/[\w.-]+$/.test(repo)) back("Repository should look like owner/name, e.g. iamshebi/zaitoon-mobiles", "err");
+  if (repo && !/^[\w.-]+\/[\w.-]+$/.test(repo)) back("Repository should look like owner/name, e.g. yourname/shop-website", "err");
   const token = str(fd, "token");
   await saveSettings({
     website_repo: repo, website_branch: str(fd, "website_branch") || "main", website_path: str(fd, "website_path") || "catalog.json",

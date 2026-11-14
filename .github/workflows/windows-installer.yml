@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       brand:
-        description: "Brand folder in brands/ (e.g. default, zaitoon)"
+        description: "Brand folder in brands/ (e.g. default)"
         required: true
-        default: zaitoon
+        default: default
   push:
     tags: ["v*"]
 
@@ -20,9 +20,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'zaitoon' }} --pack
+      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
       - uses: actions/upload-artifact@v4
         with:
-          name: installer-${{ github.event.inputs.brand || 'zaitoon' }}
+          name: installer-${{ github.event.inputs.brand || 'default' }}
           path: release/*/*.exe
           if-no-files-found: error

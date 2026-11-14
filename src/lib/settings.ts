@@ -23,7 +23,7 @@ export interface ShopSettings {
   currency: string;
   idle_timeout_minutes: number; // 0 = never sign out automatically
   website_url: string;
-  website_repo: string; // e.g. iamshebi/zaitoon-mobiles
+  website_repo: string; // e.g. yourname/shop-website
   website_branch: string;
   website_path: string;
   website_token_enc: string; // GitHub token, encrypted

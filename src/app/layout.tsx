@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/inter";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
 import { maybeFactoryReset } from "@/lib/backup";

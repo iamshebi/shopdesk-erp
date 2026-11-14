@@ -5,15 +5,15 @@ import { getSettings } from "./settings";
 import { priceLines, addEvent } from "./orders";
 import { nextNumber } from "./db";
 
-// Fictional sample data from the "Zaitoon ERP Interactive Demo" package, for trying the system.
+// Fictional sample data for trying the system.
 // Replace with real data later (Settings > Start fresh, then import).
 
 const PRODUCTS = [
-  { sku: "ZAI-OLV-001", name: "Extra Virgin Olive Oil 500ml", category: "Olive Oil", brand: "Zaitoon", price: 42.5, cost: 25, stock: 84, reorder: 20, status: "active" },
-  { sku: "ZAI-DAT-002", name: "Premium Ajwa Dates 1kg", category: "Dates", brand: "Zaitoon", price: 68, cost: 39, stock: 12, reorder: 15, status: "active" },
-  { sku: "ZAI-HON-003", name: "Sidr Honey 250g", category: "Honey", brand: "Zaitoon", price: 95, cost: 58, stock: 31, reorder: 10, status: "active" },
-  { sku: "ZAI-SPC-004", name: "Arabic Coffee Blend 250g", category: "Coffee", brand: "Zaitoon", price: 29, cost: 14, stock: 0, reorder: 12, status: "active" },
-  { sku: "ZAI-OLV-005", name: "Olive Oil Gift Set", category: "Gift Sets", brand: "Zaitoon", price: 129, cost: 72, stock: 18, reorder: 8, status: "draft" },
+  { sku: "DEMO-OLV-001", name: "Extra Virgin Olive Oil 500ml", category: "Olive Oil", brand: "House Brand", price: 42.5, cost: 25, stock: 84, reorder: 20, status: "active" },
+  { sku: "DEMO-DAT-002", name: "Premium Ajwa Dates 1kg", category: "Dates", brand: "House Brand", price: 68, cost: 39, stock: 12, reorder: 15, status: "active" },
+  { sku: "DEMO-HON-003", name: "Sidr Honey 250g", category: "Honey", brand: "House Brand", price: 95, cost: 58, stock: 31, reorder: 10, status: "active" },
+  { sku: "DEMO-SPC-004", name: "Arabic Coffee Blend 250g", category: "Coffee", brand: "House Brand", price: 29, cost: 14, stock: 0, reorder: 12, status: "active" },
+  { sku: "DEMO-OLV-005", name: "Olive Oil Gift Set", category: "Gift Sets", brand: "House Brand", price: 129, cost: 72, stock: 18, reorder: 8, status: "draft" },
 ];
 const CUSTOMERS = [
   { name: "Al Noor Grocery", email: "orders@alnoor.example", phone: "+971501112233", address: "Ras Al Khaimah" },
@@ -26,9 +26,9 @@ const SUPPLIERS = [
 ];
 
 const ORDERS = [
-  { ref: "ORD-3001", phone: "+971501112233", status: "confirmed", source: "phone", lines: [["ZAI-OLV-001", 12]] as [string, number][], delivery: 0, tracking: "", advance: 510, advanceMethod: "card" },
-  { ref: "ORD-3002", phone: "+971551234567", status: "draft", source: "whatsapp", lines: [["ZAI-DAT-002", 1], ["ZAI-HON-003", 1]] as [string, number][], delivery: 0, tracking: "", advance: 0, advanceMethod: "cash" },
-  { ref: "ORD-3003", phone: "+971502223344", status: "shipped", source: "website", lines: [["ZAI-OLV-005", 2], ["ZAI-HON-003", 3], ["ZAI-DAT-002", 4]] as [string, number][], delivery: 25, tracking: "DEMO-3003", advance: 400, advanceMethod: "bank" },
+  { ref: "ORD-3001", phone: "+971501112233", status: "confirmed", source: "phone", lines: [["DEMO-OLV-001", 12]] as [string, number][], delivery: 0, tracking: "", advance: 510, advanceMethod: "card" },
+  { ref: "ORD-3002", phone: "+971551234567", status: "draft", source: "whatsapp", lines: [["DEMO-DAT-002", 1], ["DEMO-HON-003", 1]] as [string, number][], delivery: 0, tracking: "", advance: 0, advanceMethod: "cash" },
+  { ref: "ORD-3003", phone: "+971502223344", status: "shipped", source: "website", lines: [["DEMO-OLV-005", 2], ["DEMO-HON-003", 3], ["DEMO-DAT-002", 4]] as [string, number][], delivery: 25, tracking: "DEMO-3003", advance: 400, advanceMethod: "bank" },
 ];
 
 /** Adds the sample products, customers and suppliers. Safe to run twice (skips what already exists). */
@@ -63,7 +63,7 @@ export async function loadDemoData(userId: number) {
         const lines = [] as { product_id: number; description: string; qty: number; unit_price: number; discount: number }[];
         for (const [sku, qty] of o.lines) {
           const [p] = await t<any>("SELECT id, name, price FROM products WHERE sku=$1", [sku]);
-          if (p) lines.push({ product_id: p.id, description: `Zaitoon ${p.name}`, qty, unit_price: Number(p.price), discount: 0 });
+          if (p) lines.push({ product_id: p.id, description: p.name, qty, unit_price: Number(p.price), discount: 0 });
         }
         const pr = priceLines(settings, lines, o.delivery);
         const number = await nextNumber(t, "order", "SO-");

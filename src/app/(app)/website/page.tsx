@@ -77,10 +77,10 @@ export default async function WebsitePage({ searchParams }: { searchParams: Prom
 
       <section className="card mb-6 p-6">
         <h2 className="font-semibold">Connection</h2>
-        <p className="mb-4 mt-1 text-sm text-slate-500">For websites that keep products in a catalogue file on GitHub (like the Zaitoon Mobiles site). The key needs “Contents: read and write” on that repository only.</p>
+        <p className="mb-4 mt-1 text-sm text-slate-500">For websites that keep products in a catalogue file on GitHub. The key needs “Contents: read and write” on that repository only.</p>
         <form action={saveConnection} className="grid gap-4 sm:grid-cols-2">
-          <Field label="Website address"><input name="website_url" defaultValue={s.website_url} className="input" placeholder="https://zaitoonmobiles.com" /></Field>
-          <Field label="GitHub repository"><input name="website_repo" defaultValue={s.website_repo} className="input" placeholder="iamshebi/zaitoon-mobiles" /></Field>
+          <Field label="Website address"><input name="website_url" defaultValue={s.website_url} className="input" placeholder="https://www.yourshop.com" /></Field>
+          <Field label="GitHub repository"><input name="website_repo" defaultValue={s.website_repo} className="input" placeholder="yourname/shop-website" /></Field>
           <Field label="Branch"><input name="website_branch" defaultValue={s.website_branch} className="input" /></Field>
           <Field label="Catalogue file"><input name="website_path" defaultValue={s.website_path} className="input" /></Field>
           <Field label={s.website_token_enc ? "GitHub key (saved, leave empty to keep)" : "GitHub key (fine-grained token)"}><input name="token" type="password" className="input" autoComplete="off" placeholder={s.website_token_enc ? "••••••••" : "github_pat_…"} /></Field>

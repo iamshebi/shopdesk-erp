@@ -119,7 +119,7 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
           // eslint-disable-next-line @next/next/no-img-element
           <img src={props.logo} alt="" className="h-9 w-9 rounded-xl object-contain" />
         ) : (
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-accent font-semibold text-white">{props.shopName.slice(0, 1)}</div>
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-accent font-semibold text-white shadow-[0_4px_10px_-4px_var(--accent)]">{props.shopName.slice(0, 1)}</div>
         )}
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{props.shopName}</div>
@@ -163,7 +163,7 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
                       key={href}
                       href={href}
                       onClick={() => setOpen(false)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${active(href) ? "bg-accent/10 font-medium text-accent" : "text-slate-600 hover:bg-slate-100"}`}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${active(href) ? "bg-accent/10 font-medium text-accent shadow-[inset_2px_0_0_var(--accent)]" : "text-slate-600 hover:bg-slate-100"}`}
                     >
                       <Icon size={17} strokeWidth={1.8} />
                       {tr(L, label)}
@@ -195,7 +195,7 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
 
   return (
     <>
-      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 border-r border-slate-200/80 bg-white md:block">{content}</aside>
+      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 border-e border-slate-200/70 bg-white/95 shadow-[1px_0_12px_-6px_rgba(15,23,42,0.12)] backdrop-blur md:block">{content}</aside>
       <div className="no-print fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur md:hidden">
         <span className="font-semibold">{props.shopName}</span>
         <div className="flex gap-2">

@@ -40,8 +40,8 @@ and other counters / phones on the shop Wi-Fi can open the address shown in **Fi
 and replace `icon.png` (512×512). The shop's logo, colours, TRN and invoice details are then set inside the app's Settings.
 
 **Build the installer (free, no Windows PC needed):** on GitHub open *Actions → Build Windows installer → Run workflow*,
-type the brand folder name (e.g. `zaitoon`), and download the `.exe` from the finished run.
-On a Windows PC you can also run `node scripts/build-desktop.mjs --brand zaitoon --pack`.
+type the brand folder name (e.g. `default`), and download the `.exe` from the finished run.
+On a Windows PC you can also run `node scripts/build-desktop.mjs --brand default --pack`.
 
 The first launch shows a Windows SmartScreen warning ("unknown publisher") until you buy a code-signing certificate;
 click *More info → Run anyway*. Windows Firewall will ask to allow network access — allow it on private networks
@@ -71,7 +71,7 @@ npm run dev
 
 1. **Database:** create a free project on [supabase.com](https://supabase.com) (region: closest to UAE, e.g. Mumbai or Frankfurt).
    Go to *Connect* → copy the **Transaction pooler** connection string (port 6543) and put in the database password.
-2. **Vercel:** *Add New → Project* → import this GitHub repo. Give the project the shop's name (e.g. `zaitoon-erp`).
+2. **Vercel:** *Add New → Project* → import this GitHub repo. Give the project the shop's name (e.g. `myshop-erp`).
 3. Add these environment variables:
    * `DATABASE_URL` = the Supabase connection string
    * `SESSION_SECRET` = any long random text (e.g. run `openssl rand -hex 32`)

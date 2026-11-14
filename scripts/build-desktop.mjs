@@ -1,6 +1,6 @@
 // Builds the Windows desktop app for one brand.
-//   node scripts/build-desktop.mjs --brand zaitoon          -> prepares desktop-dist/ (server + app)
-//   node scripts/build-desktop.mjs --brand zaitoon --pack   -> also makes the installer in release/<brand>/
+//   node scripts/build-desktop.mjs --brand default          -> prepares desktop-dist/ (server + app)
+//   node scripts/build-desktop.mjs --brand default --pack   -> also makes the installer in release/<brand>/
 // A brand is a folder in brands/ with brand.json and icon.png (512x512).
 import { execSync } from "node:child_process";
 import fs from "node:fs";

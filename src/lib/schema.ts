@@ -1038,4 +1038,14 @@ export const MIGRATIONS: string[] = [
      free_over NUMERIC(12,2) NOT NULL DEFAULT 0,
      days TEXT NOT NULL DEFAULT ''
    );`,
+
+  // 14. Neutral names for the sample data and default branding
+  `UPDATE products SET sku = replace(sku, 'ZAI-', 'DEMO-') WHERE sku LIKE 'ZAI-%';
+   UPDATE products SET brand = 'House Brand' WHERE brand = 'Zaitoon';
+   UPDATE brands SET name = 'House Brand' WHERE name = 'Zaitoon' AND NOT EXISTS (SELECT 1 FROM brands WHERE name = 'House Brand');
+   DELETE FROM brands WHERE name = 'Zaitoon';
+   UPDATE order_items SET description = substr(description, 9) WHERE description LIKE 'Zaitoon %';
+   UPDATE sale_items SET description = substr(description, 9) WHERE description LIKE 'Zaitoon %';
+   UPDATE settings SET value = 'My Shop' WHERE key IN ('shop_name', 'legal_name') AND value ILIKE '%zaitoon%';
+   UPDATE settings SET value = '' WHERE key = 'shop_name_ar' AND value LIKE '%زيتون%';`,
 ];
