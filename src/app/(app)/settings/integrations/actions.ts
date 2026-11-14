@@ -21,7 +21,7 @@ export async function saveEmailSettings(fd: FormData) {
   const user = await requireUser("integrations");
   const key = str(fd, "resend_key");
   await saveSettings({
-    email_from: str(fd, "email_from"), daily_report_email: str(fd, "daily_report_email"),
+    email_from: str(fd, "email_from"), daily_report_email: str(fd, "daily_report_email"), scheduled_report: ["weekly", "monthly"].includes(str(fd, "scheduled_report")) ? str(fd, "scheduled_report") : "off",
     auto_reminders: str(fd, "auto_reminders") === "on", reminder_every_days: Math.max(1, Math.round(numf(fd, "reminder_every_days")) || 7),
     ...(key ? { resend_key_enc: await encryptField(key) } : {}), ...(str(fd, "forget") === "on" ? { resend_key_enc: "" } : {}),
   });
@@ -98,4 +98,21 @@ export async function testWebhook() {
   await fireWebhook("test", { hello: "from ShopDesk ERP" });
   revalidatePath(P);
   go("Test event sent. See deliveries below.");
+}
+
+export async function saveMessaging(fd: FormData) {
+  const user = await requireUser("integrations");
+  const sms = str(fd, "sms_key"), wa = str(fd, "whatsapp_token");
+  await saveSettings({ sms_provider_url: str(fd, "sms_provider_url"), whatsapp_phone_id: str(fd, "whatsapp_phone_id"),
+    ...(sms ? { sms_key_enc: await encryptField(sms) } : {}), ...(wa ? { whatsapp_token_enc: await encryptField(wa) } : {}),
+    ...(str(fd, "forget") === "on" ? { sms_key_enc: "", whatsapp_token_enc: "" } : {}) });
+  await log(user.id, "Messaging settings changed", "", P);
+  go("Messaging settings saved");
+}
+
+export async function newSheetLink() {
+  const user = await requireUser("integrations");
+  await saveSettings({ sheet_token: crypto.randomBytes(18).toString("base64url") });
+  await log(user.id, "Google Sheets link created", "", P);
+  go("New spreadsheet link created. Old links stop working.");
 }

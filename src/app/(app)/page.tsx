@@ -11,6 +11,9 @@ import { ShoppingCart, Wrench, Recycle } from "lucide-react";
 
 const D = `(s.date AT TIME ZONE 'Asia/Dubai')::date`;
 
+import { getPref } from "@/lib/prefs";
+import { saveDashboard } from "./prefs-actions";
+
 export default async function Dashboard({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const user = await requireUser();
   const sp = await searchParams;
@@ -75,6 +78,18 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
      WHERE s.type='invoice' AND ${D} BETWEEN $1 AND $2 AND si.product_id IS NOT NULL GROUP BY 1 ORDER BY 3 DESC LIMIT 5`,
     [from, to],
   );
+  const hidden = await getPref<string[]>(user.id, "dash_hidden", []);
+  const show = (k: string) => !hidden.includes(k);
+  const WIDGETS: [string, string][] = [["totals", "Sales & profit totals"], ["business", "Business overview"], ["chart", "Sales chart"], ["repairs", "Repairs in progress"], ["recent", "Recent invoices"], ["top", "Top sellers"], ["low", "Low stock"], ["tasks", "My tasks"], ["approvals", "Waiting for approval"], ["activity", "Recent activity"], ["viewed", "Recently viewed"]];
+  const myTasks = show("tasks") && can(user, "tasks") ? await q<any>("SELECT id, title, to_char(due_date,'YYYY-MM-DD') due, priority FROM tasks WHERE assignee_id=$1 AND status <> 'done' ORDER BY due_date NULLS LAST, id LIMIT 6", [user.id]) : [];
+  const approvals = show("approvals") ? [
+    ...(can(user, "expenses.approve") ? await q<any>("SELECT 'Expense: ' || category || ' ' || total AS title, '/expenses/' || id AS href FROM expenses WHERE status='pending' LIMIT 5") : []),
+    ...(can(user, "purchases.approve") ? await q<any>("SELECT 'Purchase request ' || number AS title, '/purchases/orders/' || id AS href FROM purchase_orders WHERE status='request' LIMIT 5") : []),
+    ...(can(user, "products.approve") ? await q<any>("SELECT 'Product: ' || name AS title, '/products/' || id AS href FROM products WHERE status='pending' AND active LIMIT 5") : []),
+    ...(can(user, "hr") ? await q<any>("SELECT 'Leave: ' || e.name || ' (' || l.days || ' d)' AS title, '/hr/leave' AS href FROM leave_requests l JOIN employees e ON e.id=l.employee_id WHERE l.status='pending' LIMIT 5") : []),
+  ] : [];
+  const activity = show("activity") && can(user, "activity") ? await q<any>("SELECT a.action, a.details, a.ref, a.created_at, u.name FROM activity a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 8") : [];
+  const viewed = show("viewed") ? await getPref<{ href: string; title: string }[]>(user.id, "recent", []) : [];
   const hour = Number(new Date().toLocaleString("en-US", { hour: "numeric", hour12: false, timeZone: "Asia/Dubai" }));
   const greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
@@ -102,7 +117,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </form>
       )}
 
-      {showMoney && (
+      {showMoney && show("totals") && (
         <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Sales" value={`${s.currency} ${num(t?.sales)}`} hint={pct(t?.sales ?? 0, prev?.sales ?? 0)} href="/sales" />
           <Stat label="Invoices" value={String(t?.n ?? 0)} hint={`average ${num((t?.sales ?? 0) / Math.max(1, t?.n ?? 0))} · ${pct(t?.n ?? 0, prev?.n ?? 0)}`} href="/sales" />
@@ -111,22 +126,22 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {show("business") && <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="Products" value={String(biz.products)} hint={`${biz.categories} categories · ${biz.brands} brands · ${biz.out_of_stock} out of stock`} href="/products" />
         <Stat label="Customers" value={String(biz.customers)} hint={`${biz.new_customers} new in this period`} href="/customers" />
         <Stat label="Orders pending" value={String(ord?.pending ?? 0)} hint={`${ord?.done ?? 0} delivered in this period`} href="/orders?status=open" />
         {showProfit ? <Stat label="Stock value (at cost)" value={`${s.currency} ${num(biz.stock_value)}`} hint="everything in stock now" href="/reports/stock" /> : <Stat label="Open repairs" value={String(repairCount?.open ?? 0)} hint={`${repairCount?.ready ?? 0} ready for pickup`} href="/repairs" />}
         {showMoney ? <Stat label="Customers owe" value={`${s.currency} ${num(owed?.v)}`} hint={`unpaid invoices · ${repairCount?.open ?? 0} open repairs`} href="/customers?due=1" /> : null}
-      </div>
+      </div>}
 
       <div className="grid gap-6 xl:grid-cols-3">
-        {showMoney && (
+        {showMoney && show("chart") && (
           <div className="card p-6 xl:col-span-2">
             <div className="mb-4 flex items-baseline justify-between"><h2 className="font-semibold">Sales by {byMonth ? "month" : "day"}</h2><span className="text-xs text-slate-400">{s.currency}</span></div>
             <Bars data={days.map((d) => ({ label: d.d, value: Number(d.v) }))} />
           </div>
         )}
-        <div className="card p-6">
+        {show("repairs") && can(user, "repairs") && <div className="card p-6">
           <h2 className="mb-3 font-semibold">Repairs in progress</h2>
           {repairs.length === 0 ? <p className="text-sm text-slate-400">No open jobs.</p> : (
             <ul className="space-y-2.5">
@@ -138,8 +153,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               ))}
             </ul>
           )}
-        </div>
-        {showMoney && (
+        </div>}
+        {showMoney && show("recent") && (
           <div className="card p-6">
             <h2 className="mb-3 font-semibold">Recent invoices</h2>
             <ul className="space-y-2.5 text-sm">
@@ -151,21 +166,33 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             </ul>
           </div>
         )}
-        {showMoney && <div className="card p-6">
+        {showMoney && show("top") && <div className="card p-6">
           <h2 className="mb-3 font-semibold">Top sellers in this period</h2>
           <ul className="space-y-2.5 text-sm">
             {top.map((p, i) => <li key={i} className="flex justify-between gap-2"><span className="truncate">{p.description}</span><span className="shrink-0 text-slate-500">{p.qty} sold</span></li>)}
             {top.length === 0 && <li className="text-slate-400">Nothing sold in this period.</li>}
           </ul>
         </div>}
-        {showMoney && <div className="card p-6">
+        {showMoney && show("low") && <div className="card p-6">
           <h2 className="mb-3 font-semibold">Low stock</h2>
           <ul className="space-y-2.5 text-sm">
             {low.map((p) => <li key={p.id} className="flex justify-between gap-2"><Link href={`/products/${p.id}`} className="truncate hover:text-accent">{p.name}</Link><Badge tone={p.stock <= 0 ? "red" : "amber"}>{p.stock}</Badge></li>)}
             {low.length === 0 && <li className="text-slate-400">All good. Set a low-stock alert level on products to track them here.</li>}
           </ul>
         </div>}
+        {myTasks.length > 0 && <div className="card p-6"><h2 className="mb-3 font-semibold">My tasks</h2><ul className="space-y-2 text-sm">{myTasks.map((t) => <li key={t.id} className="flex justify-between gap-2"><Link href={`/tasks/${t.id}`} className="truncate hover:text-accent">{t.title}</Link>{t.due && <span className={`shrink-0 text-xs ${t.due < today ? "font-medium text-red-600" : "text-slate-400"}`}>{fmtDate(t.due)}</span>}</li>)}</ul></div>}
+        {approvals.length > 0 && <div className="card p-6"><h2 className="mb-3 font-semibold">Waiting for your approval</h2><ul className="space-y-2 text-sm">{approvals.map((a, i) => <li key={i}><Link href={a.href} className="hover:text-accent">{a.title}</Link></li>)}</ul></div>}
+        {activity.length > 0 && <div className="card p-6"><h2 className="mb-3 font-semibold">Recent activity</h2><ul className="space-y-2 text-sm">{activity.map((a, i) => <li key={i}><span className="font-medium">{a.action}</span> <span className="text-slate-500">{a.details}</span><div className="text-xs text-slate-400">{a.name ?? "System"} · {fmtDate(a.created_at, true)}</div></li>)}</ul></div>}
+        {viewed.length > 0 && <div className="card p-6"><h2 className="mb-3 font-semibold">Recently viewed</h2><ul className="space-y-1.5 text-sm">{viewed.slice(0, 8).map((v) => <li key={v.href}><Link href={v.href} className="hover:text-accent">{v.title}</Link></li>)}</ul></div>}
       </div>
+      <details className="mt-6 text-sm">
+        <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Customize this dashboard</summary>
+        <form action={saveDashboard} className="card mt-2 flex flex-wrap items-center gap-4 p-4">
+          <input type="hidden" name="all" value={WIDGETS.map(([k]) => k).join(",")} />
+          {WIDGETS.map(([k, label]) => <label key={k} className="flex items-center gap-1.5"><input type="checkbox" name="show" value={k} defaultChecked={show(k)} /> {label}</label>)}
+          <button className="btn-dark btn-sm">Save</button>
+        </form>
+      </details>
     </div>
   );
 }

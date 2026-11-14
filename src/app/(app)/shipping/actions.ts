@@ -46,3 +46,14 @@ export async function updateShipment(fd: FormData) {
   revalidatePath("/shipping");
   go(str(fd, "back") || "/shipping", "Updated");
 }
+
+export async function saveZone(fd: FormData) {
+  await requireUser("shipping");
+  if (str(fd, "delete")) await q("DELETE FROM shipping_zones WHERE id=$1", [Number(str(fd, "delete"))]);
+  else if (str(fd, "name")) {
+    const f = [str(fd, "name"), str(fd, "areas"), Math.max(0, numf(fd, "charge")), Math.max(0, numf(fd, "free_over")), str(fd, "days")];
+    if (Number(str(fd, "id"))) await q("UPDATE shipping_zones SET name=$2, areas=$3, charge=$4, free_over=$5, days=$6 WHERE id=$1", [Number(str(fd, "id")), ...f]);
+    else await q("INSERT INTO shipping_zones (name, areas, charge, free_over, days) VALUES ($1,$2,$3,$4,$5)", f);
+  }
+  go("/shipping/zones", "Saved");
+}

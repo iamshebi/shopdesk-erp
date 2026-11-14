@@ -17,5 +17,6 @@ export async function apiAuth(req: Request, need: "read" | "write") {
   if (!row) return { error: Response.json({ error: "Invalid or revoked API key" }, { status: 401 }) };
   if (need === "write" && row.scopes !== "write") return { error: Response.json({ error: "This key is read-only" }, { status: 403 }) };
   await q("UPDATE api_keys SET last_used_at=now() WHERE id=$1", [row.id]);
+  await q("INSERT INTO api_log (key_id, method, path) VALUES ($1,$2,$3)", [row.id, req.method, new URL(req.url).pathname]);
   return { key: row };
 }

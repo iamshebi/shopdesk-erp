@@ -2,9 +2,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { tr } from "@/lib/i18n";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare, Gift, PackageCheck, Zap, Bell, CalendarDays } from "lucide-react";
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare, Gift, PackageCheck, Zap, Bell, CalendarDays, Star } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
 type Item = { area: string; href: string; label: string; icon: typeof LayoutDashboard; key?: string };
@@ -58,13 +59,14 @@ function setTheme(dark: boolean) {
   try { localStorage.setItem("sd-theme", dark ? "dark" : "light"); } catch {}
 }
 
-export default function Sidebar(props: { shopName: string; logo: string; userName: string; role: string; areas: string[]; reportsHref?: string; settingsHref?: string; unread?: number }) {
+export default function Sidebar(props: { shopName: string; logo: string; userName: string; role: string; areas: string[]; reportsHref?: string; settingsHref?: string; unread?: number; pins?: { href: string; title: string }[]; lang?: string }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(false);
   const [closed, setClosed] = useState<string[]>([]);
   const [help, setHelp] = useState(false);
+  const L = props.lang ?? "en";
   const [unread, setUnread] = useState(props.unread ?? 0);
   useEffect(() => {
     setUnread(props.unread ?? 0);
@@ -133,18 +135,24 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
           onClick={() => { setOpen(false); window.dispatchEvent(new Event("open-search")); }}
           className="flex h-9 w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-400 transition hover:border-slate-300"
         >
-          <Search size={15} /> <span className="flex-1 text-left">Search…</span>
+          <Search size={15} /> <span className="flex-1 text-start">{tr(L, "Search")}…</span>
           <kbd className="rounded border border-slate-200 bg-white px-1.5 text-[10px]">Ctrl K</kbd>
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 pb-3">
+        {(props.pins?.length ?? 0) > 0 && (
+          <div className="mt-2">
+            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{tr(L, "Pinned")}</div>
+            {props.pins!.map((p) => <Link key={p.href} href={p.href} onClick={() => setOpen(false)} className="flex items-center gap-3 truncate rounded-xl px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"><Star size={14} className="shrink-0 text-amber-500" fill="currentColor" /><span className="truncate">{p.title}</span></Link>)}
+          </div>
+        )}
         {groups.map((g) => {
           const isClosed = g.label && closed.includes(g.id) && !g.items.some((i) => active(i.href));
           return (
             <div key={g.id} className="mt-2">
               {g.label && (
                 <button onClick={() => toggleGroup(g.id)} className="flex w-full items-center justify-between px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600">
-                  {g.label}
+                  {tr(L, g.label)}
                   <ChevronDown size={13} className={`transition ${isClosed ? "-rotate-90" : ""}`} />
                 </button>
               )}
@@ -158,7 +166,7 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
                       className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${active(href) ? "bg-accent/10 font-medium text-accent" : "text-slate-600 hover:bg-slate-100"}`}
                     >
                       <Icon size={17} strokeWidth={1.8} />
-                      {label}
+                      {tr(L, label)}
                     </Link>
                   ))}
                 </div>
@@ -178,7 +186,7 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
           </button>
           <button onClick={() => setHelp(true)} className="btn-ghost btn-sm" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><Keyboard size={14} /></button>
           <form action={logout} className="flex-1">
-            <button className="btn-ghost btn-sm w-full"><LogOut size={14} /> Sign out</button>
+            <button className="btn-ghost btn-sm w-full"><LogOut size={14} /> {tr(L, "Sign out")}</button>
           </form>
         </div>
       </div>

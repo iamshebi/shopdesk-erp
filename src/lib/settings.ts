@@ -56,6 +56,7 @@ export interface ShopSettings {
   whatsapp_phone_id: string;
   sheet_token: string;
   default_language: string;
+  scheduled_report: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -111,6 +112,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   whatsapp_phone_id: "",
   sheet_token: "",
   default_language: "en",
+  scheduled_report: "off",
   couriers: "Aramex|https://www.aramex.com/track/results?ShipmentNumber={n}\nDHL|https://www.dhl.com/ae-en/home/tracking.html?tracking-id={n}\nEmirates Post|https://www.emiratespost.ae/track?trackno={n}\nOwn driver|",
 };
 

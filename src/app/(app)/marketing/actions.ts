@@ -20,10 +20,10 @@ export async function saveCoupon(fd: FormData) {
   const type = str(fd, "type") === "amount" ? "amount" : "percent";
   const value = Math.max(0, numf(fd, "value"));
   if (!value || (type === "percent" && value > 100)) go("/marketing", "Enter a valid discount (percent 1–100 or an amount)", "err");
-  const f = [code, type, value, Math.max(0, numf(fd, "min_total")), str(fd, "starts_on") || null, str(fd, "ends_on") || null, Math.max(0, Math.round(numf(fd, "max_uses"))), str(fd, "note")];
+  const f = [code, type, value, Math.max(0, numf(fd, "min_total")), str(fd, "starts_on") || null, str(fd, "ends_on") || null, Math.max(0, Math.round(numf(fd, "max_uses"))), str(fd, "note"), str(fd, "affiliate"), Math.min(100, Math.max(0, numf(fd, "affiliate_rate")))];
   try {
-    if (id) await q("UPDATE coupons SET code=$2, type=$3, value=$4, min_total=$5, starts_on=$6, ends_on=$7, max_uses=$8, note=$9 WHERE id=$1", [id, ...f]);
-    else await q("INSERT INTO coupons (code, type, value, min_total, starts_on, ends_on, max_uses, note) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)", f);
+    if (id) await q("UPDATE coupons SET code=$2, type=$3, value=$4, min_total=$5, starts_on=$6, ends_on=$7, max_uses=$8, note=$9, affiliate=$10, affiliate_rate=$11 WHERE id=$1", [id, ...f]);
+    else await q("INSERT INTO coupons (code, type, value, min_total, starts_on, ends_on, max_uses, note, affiliate, affiliate_rate) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", f);
   } catch {
     go("/marketing", `Code ${code} already exists`, "err");
   }
@@ -40,7 +40,7 @@ export async function toggleCoupon(fd: FormData) {
 
 export async function saveLoyalty(fd: FormData) {
   const user = await requireUser("marketing");
-  await saveSettings({ loyalty_points_per_unit: Math.max(0, numf(fd, "loyalty_points_per_unit")), loyalty_point_value: Math.max(0, numf(fd, "loyalty_point_value")), loyalty_min_redeem: Math.max(0, Math.round(numf(fd, "loyalty_min_redeem"))) });
+  await saveSettings({ loyalty_points_per_unit: Math.max(0, numf(fd, "loyalty_points_per_unit")), loyalty_point_value: Math.max(0, numf(fd, "loyalty_point_value")), loyalty_min_redeem: Math.max(0, Math.round(numf(fd, "loyalty_min_redeem"))), referral_points: Math.max(0, Math.round(numf(fd, "referral_points"))) });
   await log(user.id, "Loyalty settings changed", "", "/marketing");
   go("/marketing", "Loyalty settings saved");
 }

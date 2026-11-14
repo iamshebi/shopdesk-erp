@@ -9,8 +9,12 @@ import Submit from "@/components/submit";
 import { ShieldCheck, ShieldOff, KeyRound, MonitorSmartphone } from "lucide-react";
 import { changePassword, start2fa, confirm2fa, disable2fa, revokeMySession, revokeOtherSessions } from "./actions";
 
+import { setLanguage } from "../prefs-actions";
+import { getPref } from "@/lib/prefs";
+
 export default async function AccountPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const me = await requireUser();
+  const lang = await getPref<string>(me.id, "lang", "en");
   const sp = await searchParams;
   const s = await getSettings();
   const u = await one<any>("SELECT totp_enabled, totp_secret, password_changed_at, created_at FROM users WHERE id=$1", [me.id]);
@@ -25,6 +29,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   return (
     <div className="max-w-4xl">
       <PageHeader title="My account" subtitle={`${me.name} · ${me.role}`} />
+      <form action={setLanguage} className="card mb-6 flex flex-wrap items-center gap-3 p-4 text-sm"><span className="font-medium">Language / اللغة</span><select name="lang" defaultValue={lang} className="input w-40"><option value="en">English</option><option value="ar">العربية (menu, right-to-left)</option></select><Submit className="btn-dark btn-sm">Save</Submit><span className="text-xs text-slate-400">Arabic currently covers the menu and layout direction; page text stays in English. Invoices already print in both languages.</span></form>
       {sp.ok && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
 

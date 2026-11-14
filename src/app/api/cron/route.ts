@@ -1,5 +1,5 @@
 import { runRecurring, autoReminders } from "@/lib/billing";
-import { runAutomations, dailySummaryEmail } from "@/lib/automation";
+import { runAutomations, dailySummaryEmail, scheduledReportEmail } from "@/lib/automation";
 import { ensureLedger } from "@/lib/accounting";
 
 export const maxDuration = 60;
@@ -15,6 +15,7 @@ export async function GET(req: Request) {
   await step("reminders", () => autoReminders(base));
   await step("automation", () => runAutomations(base));
   await step("summary", () => dailySummaryEmail(base));
+  await step("report", () => scheduledReportEmail(base));
   await step("ledger", () => ensureLedger());
   console.log("cron", JSON.stringify(out));
   return Response.json(out);

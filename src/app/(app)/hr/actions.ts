@@ -22,6 +22,7 @@ export async function saveEmployee(fd: FormData) {
   const f = [name, str(fd, "phone"), str(fd, "email"), str(fd, "designation"), dept, Number(str(fd, "user_id")) || null, str(fd, "join_date") || null,
     Math.max(0, numf(fd, "basic_salary")), Math.max(0, numf(fd, "allowances")), str(fd, "annual_leave_days") === "" ? 30 : Math.max(0, numf(fd, "annual_leave_days")),
     str(fd, "labour_card_no"), str(fd, "bank_routing"), str(fd, "iban").replace(/\s/g, "").toUpperCase(), str(fd, "notes")];
+  const shift = [str(fd, "shift_start"), str(fd, "shift_end")];
   let eid = id;
   if (id) await q(`UPDATE employees SET name=$2, phone=$3, email=$4, designation=$5, department_id=$6, user_id=$7, join_date=$8, basic_salary=$9, allowances=$10, annual_leave_days=$11, labour_card_no=$12, bank_routing=$13, iban=$14, notes=$15, active=$16 WHERE id=$1`, [id, ...f, str(fd, "active") !== "off"]);
   else {
@@ -32,6 +33,7 @@ export async function saveEmployee(fd: FormData) {
       return r.id;
     });
   }
+  await q("UPDATE employees SET shift_start=$2, shift_end=$3 WHERE id=$1", [eid, ...shift]);
   await log(user.id, id ? "Employee edited" : "Employee added", name, `/hr/${eid}`);
   revalidatePath("/hr");
   go(`/hr/${eid}`, "Saved");
@@ -149,4 +151,36 @@ export async function saveCommissionRates(fd: FormData) {
   }
   await log(user.id, "Commission rates changed", "", "/hr/commissions");
   go(`/hr/commissions?month=${str(fd, "month")}`, "Rates saved");
+}
+
+export async function saveHoliday(fd: FormData) {
+  await requireUser("hr");
+  if (str(fd, "delete")) await q("DELETE FROM holidays WHERE id=$1", [Number(str(fd, "delete"))]);
+  else if (str(fd, "date") && str(fd, "name")) await q("INSERT INTO holidays (date, name) VALUES ($1,$2) ON CONFLICT (date) DO UPDATE SET name=$2", [str(fd, "date"), str(fd, "name")]);
+  go("/hr/holidays", "Saved");
+}
+
+/** Marks every active employee as "day off" on a public holiday. */
+export async function applyHoliday(fd: FormData) {
+  await requireUser("hr");
+  const h = await one<any>("SELECT to_char(date,'YYYY-MM-DD') d, name FROM holidays WHERE id=$1", [Number(str(fd, "id"))]);
+  if (h) await q("INSERT INTO attendance (employee_id, date, status, note) SELECT id, $1, 'off', $2 FROM employees WHERE active ON CONFLICT (employee_id, date) DO NOTHING", [h.d, h.name]);
+  go("/hr/holidays", "Marked as a day off for everyone");
+}
+
+export async function saveReview(fd: FormData) {
+  const user = await requireUser("hr");
+  const eid = Number(str(fd, "employee_id"));
+  await q("INSERT INTO employee_reviews (employee_id, period, rating, strengths, improve, reviewer_id) VALUES ($1,$2,$3,$4,$5,$6)", [eid, str(fd, "period"), Math.min(5, Math.max(1, Math.round(numf(fd, "rating")) || 3)), str(fd, "strengths"), str(fd, "improve"), user.id]);
+  await log(user.id, "Performance review added", `#${eid}`, `/hr/${eid}`);
+  go(`/hr/${eid}`, "Review saved");
+}
+
+export async function saveOnboarding(fd: FormData) {
+  await requireUser("hr");
+  const eid = Number(str(fd, "employee_id"));
+  const done: Record<string, boolean> = {};
+  for (const k of fd.getAll("step").map(String)) done[k] = true;
+  await q("UPDATE employees SET onboarding=$2 WHERE id=$1", [eid, JSON.stringify(done)]);
+  go(`/hr/${eid}`, "Checklist saved");
 }

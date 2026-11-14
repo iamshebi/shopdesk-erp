@@ -16,7 +16,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: Pr
   const today = new Date().toISOString().slice(0, 10);
   return (
     <div>
-      <PageHeader title="Marketing" subtitle="Coupons, vouchers and loyalty points" />
+      <PageHeader title="Marketing" subtitle="Coupons, vouchers and loyalty points"><Link href="/marketing/campaigns" className="btn-primary">Campaigns, carts &amp; affiliates</Link></PageHeader>
       {sp.ok && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -31,6 +31,8 @@ export default async function MarketingPage({ searchParams }: { searchParams: Pr
             <div><label className="label">Ends</label><input type="date" name="ends_on" className="input" /></div>
             <div><label className="label">Max uses (0 = unlimited)</label><input name="max_uses" className="input" inputMode="numeric" /></div>
             <div><label className="label">Note / campaign</label><input name="note" className="input" /></div>
+            <div className="sm:col-span-2"><label className="label">Affiliate / influencer name (optional)</label><input name="affiliate" className="input" /></div>
+            <div><label className="label">Their commission %</label><input name="affiliate_rate" className="input" inputMode="decimal" /></div>
             <div className="sm:col-span-4"><Submit>Create coupon</Submit></div>
           </form>
           <div className="card overflow-x-auto">
@@ -61,6 +63,7 @@ export default async function MarketingPage({ searchParams }: { searchParams: Pr
             <div><label className="label">Points earned per {s.currency} 1 spent (0 = off)</label><input name="loyalty_points_per_unit" defaultValue={s.loyalty_points_per_unit} className="input" inputMode="decimal" /></div>
             <div><label className="label">Value of 1 point ({s.currency})</label><input name="loyalty_point_value" defaultValue={s.loyalty_point_value} className="input" inputMode="decimal" /></div>
             <div><label className="label">Minimum points to redeem</label><input name="loyalty_min_redeem" defaultValue={s.loyalty_min_redeem} className="input" inputMode="numeric" /></div>
+            <div><label className="label">Referral reward: points to the customer who referred a new buyer (0 = off)</label><input name="referral_points" defaultValue={s.referral_points || ""} className="input" inputMode="numeric" /></div>
             <p className="text-xs text-slate-500">Points are added to named customers on every invoice. Redeem them from the customer&apos;s page: it makes a one-time voucher code to use at the till.</p>
             <Submit className="btn-dark">Save</Submit>
           </form>

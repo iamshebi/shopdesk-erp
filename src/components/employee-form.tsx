@@ -12,6 +12,8 @@ export default function EmployeeForm({ action, e = {}, departments, users }: { a
       {F("Joined on", <input type="date" name="join_date" defaultValue={e.join_date ?? ""} className="input" />)}
       {F("Basic salary / month", <input name="basic_salary" defaultValue={Number(e.basic_salary) || ""} className="input" inputMode="decimal" />)}
       {F("Allowances / month", <input name="allowances" defaultValue={Number(e.allowances) || ""} className="input" inputMode="decimal" placeholder="housing, transport…" />)}
+      {F("Shift starts", <input type="time" name="shift_start" defaultValue={e.shift_start ?? ""} className="input" />)}
+      {F("Shift ends", <input type="time" name="shift_end" defaultValue={e.shift_end ?? ""} className="input" />)}
       {F("Annual leave days / year", <input name="annual_leave_days" defaultValue={e.annual_leave_days ?? 30} className="input" inputMode="decimal" />)}
       {F("Labour card / personal no. (WPS)", <input name="labour_card_no" defaultValue={e.labour_card_no} className="input" />)}
       {F("Bank routing code (WPS)", <input name="bank_routing" defaultValue={e.bank_routing} className="input" />)}

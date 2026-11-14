@@ -22,7 +22,7 @@ export default async function ShippingPage({ searchParams }: { searchParams: Pro
     COALESCE(sum(cod_amount) FILTER (WHERE status='delivered' AND NOT cod_collected),0) cod_due, COALESCE(sum(cost) FILTER (WHERE created_at > now() - interval '30 days'),0) cost30 FROM shipments`);
   return (
     <div>
-      <PageHeader title="Shipping" subtitle="Courier deliveries, tracking and cash on delivery" />
+      <PageHeader title="Shipping" subtitle="Courier deliveries, tracking and cash on delivery"><Link href="/shipping/zones" className="btn-ghost">Delivery zones &amp; charges</Link><Link href="/reports/performance" className="btn-ghost">Delivery report</Link></PageHeader>
       {sp.ok && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -54,7 +54,7 @@ export default async function ShippingPage({ searchParams }: { searchParams: Pro
               const ss = shipStatus(r.status);
               return (
                 <tr key={r.id}>
-                  <td className="font-medium">{r.number}{r.order_no && <Link href={`/orders/${r.order_id}`} className="block text-xs text-accent">{r.order_no}</Link>}<div className="text-xs text-slate-400">{fmtDate(r.created_at)}</div></td>
+                  <td className="font-medium">{r.number} <a href={`/print/shipping/${r.id}`} target="_blank" className="ml-1 text-xs font-normal text-accent">Label</a>{r.order_no && <Link href={`/orders/${r.order_id}`} className="block text-xs text-accent">{r.order_no}</Link>}<div className="text-xs text-slate-400">{fmtDate(r.created_at)}</div></td>
                   <td>{r.customer_name}<div className="text-xs text-slate-400">{r.customer_phone} {r.address}</div></td>
                   <td>{r.courier}<div className="text-xs">{url ? <a href={url} target="_blank" className="text-accent">{r.tracking_no}</a> : r.tracking_no || "—"}</div>
                     {r.customer_phone && url && <a href={waLink(r.customer_phone, `${s.shop_name}: your order is on the way with ${r.courier}. Track it here: ${url}`)} target="_blank" className="text-xs text-emerald-600">Send tracking</a>}</td>

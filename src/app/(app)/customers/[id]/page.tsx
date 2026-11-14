@@ -10,6 +10,7 @@ import { MessageCircle } from "lucide-react";
 import { updateCustomer } from "../actions";
 import { addActivity, completeActivity, saveCustomerCrm, saveCustomerPricing } from "../../crm/actions";
 import { storeCreditBalance } from "@/lib/store-credit";
+import { setOptOut, setReferrer } from "../../marketing/campaigns/actions";
 import { customerToken, baseUrl } from "@/lib/public-link";
 import { ACTIVITY_TYPES } from "@/lib/crm";
 import { redeemPoints } from "../../marketing/actions";
@@ -30,6 +31,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const st = await getSettings();
   const pts = (await one<{ p: number }>("SELECT COALESCE(sum(points),0)::int p FROM loyalty_ledger WHERE customer_id=$1", [c.id]))!.p;
   const credit = await storeCreditBalance(q, c.id);
+  const referrer = c.referred_by ? await one<any>("SELECT id, name FROM customers WHERE id=$1", [c.referred_by]) : null;
   const portal = `${await baseUrl()}/portal/${await customerToken(c.id)}`;
   const clv = await one<any>(`SELECT COALESCE(sum(CASE WHEN type='invoice' THEN total ELSE -total END),0) spent, COALESCE(sum(CASE WHEN type='invoice' THEN total-vat-cost ELSE -(total-vat-cost) END),0) profit,
     count(*) FILTER (WHERE type='invoice')::int n, min(date) first, max(date) last FROM sales WHERE customer_id=$1`, [c.id]);
@@ -129,6 +131,12 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             {vouchers.map((v) => <div key={v.code} className="flex justify-between text-xs"><span className="font-mono">{v.code}</span><span>{Number(v.value).toFixed(2)} {v.uses ? "· used" : "· unused"}</span></div>)}
           </form>
         )}
+        <div className="card h-fit space-y-2 p-5 text-sm">
+          <h3 className="font-semibold">Marketing</h3>
+          <form action={setOptOut} className="flex items-center justify-between"><input type="hidden" name="id" value={c.id} /><span>{c.marketing_opt_out ? "Opted out of offers" : "Receives offers"}</span><Submit className="btn-ghost btn-sm">{c.marketing_opt_out ? "Opt back in" : "Opt out"}</Submit></form>
+          {referrer ? <div className="text-slate-500">Referred by <Link href={`/customers/${referrer.id}`} className="text-accent">{referrer.name}</Link></div>
+            : <form action={setReferrer} className="flex gap-2"><input type="hidden" name="id" value={c.id} /><input name="referrer" placeholder="Referred by (phone or name)" className="input" /><Submit className="btn-ghost shrink-0">Set</Submit></form>}
+        </div>
         <form action={saveCustomerPricing} className="card h-fit space-y-3 p-5">
           <h3 className="font-semibold">Customer pricing</h3>
           <input type="hidden" name="id" value={c.id} />

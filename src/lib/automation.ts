@@ -101,3 +101,24 @@ export async function dailySummaryEmail(base: string) {
     <p><a href="${base}">Open ShopDesk</a></p></div>`;
   return (await sendEmail(s.daily_report_email, `${s.shop_name} daily summary`, html)).ok;
 }
+
+/** Weekly (Mondays) or monthly (1st) results email to the owner. */
+export async function scheduledReportEmail(base: string) {
+  const s = await getSettings();
+  if (!s.daily_report_email || s.scheduled_report === "off") return false;
+  const now = new Date(Date.now() + 4 * 3600e3);
+  const weekly = s.scheduled_report === "weekly";
+  if (weekly ? now.getUTCDay() !== 1 : now.getUTCDate() !== 1) return false;
+  const span = weekly ? "7 days" : "1 month";
+  const D = "(now() AT TIME ZONE 'Asia/Dubai')::date";
+  const r = await one<any>(`SELECT COALESCE(sum(CASE WHEN type='invoice' THEN total ELSE -total END),0) sales, COALESCE(sum(CASE WHEN type='invoice' THEN total-vat-cost ELSE -(total-vat-cost) END),0) gp, count(*) FILTER (WHERE type='invoice')::int n
+    FROM sales WHERE (date AT TIME ZONE 'Asia/Dubai')::date >= ${D} - interval '${span}' AND (date AT TIME ZONE 'Asia/Dubai')::date < ${D}`);
+  const exp = await one<any>(`SELECT COALESCE(sum(amount),0) v FROM expenses WHERE status='approved' AND date >= ${D} - interval '${span}' AND date < ${D}`);
+  const top = await q<any>(`SELECT si.description, sum(si.qty)::int qty, sum(si.total) v FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE s.type='invoice' AND (s.date AT TIME ZONE 'Asia/Dubai')::date >= ${D} - interval '${span}' GROUP BY 1 ORDER BY 3 DESC LIMIT 10`);
+  const newC = await one<any>(`SELECT count(*)::int n FROM customers WHERE created_at >= now() - interval '${span}'`);
+  const row = (l: string, v: string) => `<tr><td style="padding:4px 12px 4px 0;color:#64748b">${l}</td><td style="padding:4px 0;font-weight:600">${v}</td></tr>`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#1e293b"><h2>${esc(s.shop_name)}: ${weekly ? "last week" : "last month"}</h2><table>
+    ${row("Sales", `${s.currency} ${num(r.sales)} (${r.n} invoices)`)}${row("Gross profit", `${s.currency} ${num(r.gp)}`)}${row("Expenses", `${s.currency} ${num(exp.v)}`)}${row("Net profit", `${s.currency} ${num(Number(r.gp) - Number(exp.v))}`)}${row("New customers", String(newC.n))}</table>
+    <h3>Top products</h3><table>${top.map((t) => row(esc(t.description), `${t.qty} sold · ${num(t.v)}`)).join("")}</table><p><a href="${base}/reports">Open full reports</a></p></div>`;
+  return (await sendEmail(s.daily_report_email, `${s.shop_name} ${weekly ? "weekly" : "monthly"} report`, html)).ok;
+}

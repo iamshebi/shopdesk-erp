@@ -126,6 +126,7 @@ export async function setOrderStatus(fd: FormData) {
     }
   });
   await (await import("@/lib/webhooks")).fireWebhook("order.status", { id, number: o.number, status: to });
+  if (o.kind === "order") await (await import("@/lib/customer-notify")).notifyOrderStatus(o, to, await (await import("@/lib/public-link")).baseUrl(), str(fd, "tracking_no") || o.tracking_no);
   await log(user.id, `${o.kind === "quote" ? "Quotation" : "Order"} ${statusInfo(o.kind, to).label.toLowerCase()}`, o.number, `/orders/${id}`);
   revalidatePath("/orders");
   go(`/orders/${id}`, `Marked as ${statusInfo(o.kind, to).label}`);
@@ -203,6 +204,7 @@ export async function invoiceOrder(fd: FormData) {
       await addEvent(t, id, "delivered", `Invoice ${inv.number}`, user.id);
       return sid;
     });
+    await (await import("@/lib/customer-notify")).notifyOrderStatus(o, "delivered", await (await import("@/lib/public-link")).baseUrl());
   } catch (e: any) {
     go(`/orders/${id}`, e instanceof SaleError ? e.message : "Could not create the invoice", "err");
   }

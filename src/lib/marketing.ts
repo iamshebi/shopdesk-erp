@@ -30,8 +30,13 @@ export async function loyaltyBalance(t: Exec, customerId: number) {
 /** Points earned on an invoice: floor(total × points per currency unit). */
 export async function earnPoints(t: Exec, s: ShopSettings, saleId: number, customerId: number | null, total: number, number: string) {
   const rate = Number(s.loyalty_points_per_unit) || 0;
-  if (!customerId || rate <= 0) return 0;
-  const pts = Math.floor(total * rate);
+  if (!customerId) return 0;
+  const pts = rate > 0 ? Math.floor(total * rate) : 0;
+  const refPts = Math.round(Number(s.referral_points) || 0);
+  if (refPts > 0) {
+    const [c] = await t<{ referred_by: number | null; n: number }>("SELECT referred_by, (SELECT count(*)::int FROM sales WHERE customer_id=$1 AND type='invoice') n FROM customers WHERE id=$1", [customerId]);
+    if (c?.referred_by && c.n === 1) await t("INSERT INTO loyalty_ledger (customer_id, points, sale_id, note) VALUES ($1,$2,$3,$4)", [c.referred_by, refPts, saleId, `Referral reward (${number})`]);
+  }
   if (pts > 0) await t("INSERT INTO loyalty_ledger (customer_id, points, sale_id, note) VALUES ($1,$2,$3,$4)", [customerId, pts, saleId, `Earned on ${number}`]);
   return pts;
 }

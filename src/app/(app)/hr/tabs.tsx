@@ -3,6 +3,7 @@ const TABS = [
   { href: "/hr", label: "Employees" },
   { href: "/hr/attendance", label: "Attendance" },
   { href: "/hr/leave", label: "Leave" },
+  { href: "/hr/holidays", label: "Holidays" },
   { href: "/hr/payroll", label: "Payroll" },
   { href: "/hr/commissions", label: "Commissions" },
 ];

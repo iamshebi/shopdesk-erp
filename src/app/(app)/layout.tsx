@@ -5,6 +5,8 @@ import { getSettings } from "@/lib/settings";
 import Sidebar from "@/components/sidebar";
 import IdleLogout from "@/components/idle-logout";
 import CommandPalette from "@/components/command-palette";
+import PageTools from "@/components/page-tools";
+import { getPref, type PageRef } from "@/lib/prefs";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const n = await one<{ n: number }>("SELECT count(*)::int AS n FROM users");
@@ -41,6 +43,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { title: "Automation rules", href: "/automation", perm: "integrations" },
     { title: "Integrations: email, payments, API keys", href: "/settings/integrations", perm: "integrations" },
     { title: "Report builder", href: "/reports/builder", perm: "reports" },
+    { title: "Purchase orders & requests", href: "/purchases/orders", perm: "purchases" },
+    { title: "Reorder suggestions", href: "/purchases/reorder", perm: "purchases" },
+    { title: "Categories & brands", href: "/products/catalog", perm: "products.view" },
+    { title: "Campaigns & abandoned carts", href: "/marketing/campaigns", perm: "marketing" },
+    { title: "Website banners, pages & SEO", href: "/website/content", perm: "website" },
+    { title: "Delivery zones", href: "/shipping/zones", perm: "shipping" },
+    { title: "Calendar", href: "/calendar", perm: "" },
+    { title: "Notifications", href: "/notifications", perm: "" },
+    { title: "Sales commissions", href: "/hr/commissions", perm: "payroll" },
+    { title: "Public holidays", href: "/hr/holidays", perm: "hr" },
+    { title: "Approvals, custom fields & closing the books", href: "/settings/workflow", perm: "settings" },
+    { title: "System health & logs", href: "/settings/system", perm: "settings" },
+    { title: "Team, support & delivery reports", href: "/reports/performance", perm: "reports" },
     { title: "Record an expense", href: "/expenses", perm: "expenses" },
     { title: "Day close", href: "/reports/day", perm: "reports.day" },
     { title: "VAT return report", href: "/reports/vat", perm: "reports.vat" },
@@ -51,8 +66,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]
     .filter((a) => !a.perm || canAny(user, [a.perm]))
     .map(({ title, href }) => ({ group: "Quick actions", title, sub: "", href }));
+  const pins = await getPref<PageRef[]>(user.id, "pins", []);
+  const recent = await getPref<PageRef[]>(user.id, "recent", []);
+  const lang = await getPref<string>(user.id, "lang", s.default_language || "en");
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
       <CommandPalette actions={ACTIONS} />
       <Sidebar
         shopName={s.shop_name}
@@ -60,12 +78,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userName={user.name}
         role={user.role}
         areas={areas}
+        pins={pins}
+        lang={lang}
         unread={(await one<{ n: number }>("SELECT count(*)::int n FROM notifications WHERE user_id=$1 AND read_at IS NULL", [user.id]))?.n ?? 0}
         reportsHref={canAny(user, ["reports"]) ? "/reports" : canAny(user, ["reports.day"]) ? "/reports/day" : "/reports/vat"}
         settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : canAny(user, ["integrations"]) ? "/settings/integrations" : "/settings/activity"}
       />
       <IdleLogout minutes={s.idle_timeout_minutes} />
-      <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8">{children}</main>
+      <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8"><PageTools pins={pins} recent={recent} />{children}</main>
     </div>
   );
 }

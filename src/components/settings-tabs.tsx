@@ -9,6 +9,7 @@ const TABS = [
   { href: "/settings/integrations", label: "Integrations", perm: "integrations" },
   { href: "/settings/data", label: "Import, export & backup", perm: "data" },
   { href: "/settings/activity", label: "Activity log", perm: "activity" },
+  { href: "/settings/system", label: "System health & logs", perm: "settings" },
 ];
 
 export default async function SettingsTabs({ active }: { active: string }) {

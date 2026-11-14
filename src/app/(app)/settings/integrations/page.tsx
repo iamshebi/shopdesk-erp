@@ -7,7 +7,7 @@ import { fmtDate } from "@/lib/util";
 import { PageHeader, Badge } from "@/components/ui";
 import Submit from "@/components/submit";
 import SettingsTabs from "@/components/settings-tabs";
-import { saveEmailSettings, testEmail, savePaymentSettings, saveShippingCurrency, deleteCurrency, createApiKey, revokeApiKey, addWebhook, deleteWebhook, testWebhook } from "./actions";
+import { saveEmailSettings, testEmail, savePaymentSettings, saveShippingCurrency, deleteCurrency, createApiKey, revokeApiKey, addWebhook, deleteWebhook, testWebhook, saveMessaging, newSheetLink } from "./actions";
 
 export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requireUser("integrations");
@@ -35,6 +35,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             <div><label className="label">Send from address</label><input name="email_from" defaultValue={s.email_from} className="input" placeholder="invoices@yourshop.ae" /></div>
             <div><label className="label">Resend API key {s.resend_key_enc && <Badge tone="green">saved</Badge>}</label><input name="resend_key" type="password" className="input" placeholder={s.resend_key_enc ? "•••••• (leave blank to keep)" : "re_…"} /></div>
             <div><label className="label">Daily summary email to (owner)</label><input name="daily_report_email" defaultValue={s.daily_report_email} className="input" placeholder="you@email.com" /></div>
+            <div><label className="label">Full results report by email</label><select name="scheduled_report" defaultValue={s.scheduled_report} className="input"><option value="off">Off</option><option value="weekly">Every Monday</option><option value="monthly">1st of each month</option></select></div>
             <div><label className="label">Remind every (days)</label><input name="reminder_every_days" defaultValue={s.reminder_every_days} className="input" inputMode="numeric" /></div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="auto_reminders" defaultChecked={s.auto_reminders} /> Email overdue invoice reminders automatically</label>
             {s.resend_key_enc && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="forget" /> Remove saved key</label>}
@@ -51,6 +52,23 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             {s.stripe_key_enc && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="forget" /> Remove saved keys</label>}
             <div className="sm:col-span-2"><Submit>Save payment settings</Submit></div>
           </form>
+        </Card>
+        <Card title="WhatsApp Business API & SMS" hint="Optional. Without these, WhatsApp messages open on your phone with the text ready. With them, campaigns and reminders are sent automatically.">
+          <form action={saveMessaging} className="grid gap-3 sm:grid-cols-2">
+            <div><label className="label">WhatsApp phone number ID (Meta)</label><input name="whatsapp_phone_id" defaultValue={s.whatsapp_phone_id} className="input" /></div>
+            <div><label className="label">WhatsApp access token {s.whatsapp_token_enc && <Badge tone="green">saved</Badge>}</label><input name="whatsapp_token" type="password" className="input" placeholder={s.whatsapp_token_enc ? "•••••• (leave blank to keep)" : ""} /></div>
+            <div><label className="label">SMS gateway link (use {"{to}"} {"{text}"} {"{key}"})</label><input name="sms_provider_url" defaultValue={s.sms_provider_url} className="input" placeholder="https://api.provider.ae/send?to={to}&text={text}&key={key}" /></div>
+            <div><label className="label">SMS key {s.sms_key_enc && <Badge tone="green">saved</Badge>}</label><input name="sms_key" type="password" className="input" placeholder={s.sms_key_enc ? "•••••• (leave blank to keep)" : ""} /></div>
+            {(s.sms_key_enc || s.whatsapp_token_enc) && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="forget" /> Remove saved keys</label>}
+            <div className="sm:col-span-2"><Submit>Save messaging settings</Submit></div>
+          </form>
+        </Card>
+        <Card title="Google Sheets, Excel, Google Shopping & Instagram" hint="Live links other tools can read. Keep the spreadsheet link private: anyone with it can read the data.">
+          {s.sheet_token ? <div className="space-y-1 text-xs">{["sales", "products", "stock", "customers", "orders", "expenses"].map((d) => <div key={d}><span className="inline-block w-20 font-medium capitalize">{d}</span><code className="break-all rounded bg-slate-100 px-1">=IMPORTDATA(&quot;{base}/api/feeds/sheet?ds={d}&amp;token={s.sheet_token}&quot;)</code></div>)}</div> : <p className="text-sm text-slate-500">No spreadsheet link yet.</p>}
+          <form action={newSheetLink} className="mt-3"><Submit className="btn-ghost btn-sm" confirm={s.sheet_token ? "Create a new link? Sheets using the old link will stop updating." : undefined}>{s.sheet_token ? "Replace link" : "Create spreadsheet link"}</Submit></form>
+          <p className="mt-4 text-sm">Product feed for Google Merchant Center and Meta / Instagram shops:</p>
+          <code className="mt-1 block break-all rounded bg-slate-100 p-2 text-xs">{base}/api/feeds/google</code>
+          <p className="mt-3 text-xs text-slate-500">Google Analytics, Tag Manager, Search Console and Meta Pixel IDs are set under Website → Banners, pages, SEO.</p>
         </Card>
         <Card title="Couriers & currencies" hint="One courier per line: Name|tracking link with {n} where the tracking number goes. Exchange rates are used to show quotations in other currencies.">
           <form action={saveShippingCurrency} className="grid gap-3 sm:grid-cols-4">
