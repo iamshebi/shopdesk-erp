@@ -815,4 +815,140 @@ export const MIGRATIONS: string[] = [
      error TEXT NOT NULL DEFAULT '',
      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
    );`,
+
+  // 12. Files & documents, product variants/custom fields/related/approval, categories & brands,
+  //     bin locations, batches & expiry, purchase orders & approvals, debit notes, commissions,
+  //     store credit, expense approval, books lock
+  `CREATE TABLE IF NOT EXISTS files (
+     id SERIAL PRIMARY KEY,
+     kind TEXT NOT NULL,
+     owner_id INTEGER NOT NULL,
+     name TEXT NOT NULL,
+     mime TEXT NOT NULL DEFAULT 'application/octet-stream',
+     size INTEGER NOT NULL DEFAULT 0,
+     data BYTEA NOT NULL,
+     sort INTEGER NOT NULL DEFAULT 0,
+     uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS files_owner_idx ON files (kind, owner_id);
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES products(id) ON DELETE SET NULL;
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS attributes JSONB NOT NULL DEFAULT '{}';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS related_ids INTEGER[] NOT NULL DEFAULT '{}';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT '{}';
+   ALTER TABLE products ADD COLUMN IF NOT EXISTS track_batch BOOLEAN NOT NULL DEFAULT FALSE;
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT '{}';
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS price_list JSONB NOT NULL DEFAULT '{}';
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0;
+   ALTER TABLE employees ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT '{}';
+   ALTER TABLE orders ADD COLUMN IF NOT EXISTS custom JSONB NOT NULL DEFAULT '{}';
+   CREATE TABLE IF NOT EXISTS custom_fields (
+     id SERIAL PRIMARY KEY,
+     entity TEXT NOT NULL,
+     key TEXT NOT NULL,
+     label TEXT NOT NULL,
+     type TEXT NOT NULL DEFAULT 'text',
+     options TEXT NOT NULL DEFAULT '',
+     required BOOLEAN NOT NULL DEFAULT FALSE,
+     sort INTEGER NOT NULL DEFAULT 0,
+     UNIQUE (entity, key)
+   );
+   CREATE TABLE IF NOT EXISTS categories (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL UNIQUE,
+     parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+     description TEXT NOT NULL DEFAULT '',
+     sort INTEGER NOT NULL DEFAULT 0
+   );
+   CREATE TABLE IF NOT EXISTS brands (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL UNIQUE,
+     description TEXT NOT NULL DEFAULT '',
+     website TEXT NOT NULL DEFAULT ''
+   );
+   INSERT INTO categories (name) SELECT DISTINCT category FROM products WHERE category <> '' ON CONFLICT DO NOTHING;
+   INSERT INTO brands (name) SELECT DISTINCT brand FROM products WHERE brand <> '' ON CONFLICT DO NOTHING;
+   ALTER TABLE product_stock ADD COLUMN IF NOT EXISTS location TEXT NOT NULL DEFAULT '';
+   CREATE TABLE IF NOT EXISTS batches (
+     id SERIAL PRIMARY KEY,
+     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+     warehouse_id INTEGER REFERENCES warehouses(id),
+     batch_no TEXT NOT NULL,
+     expiry_date DATE,
+     qty INTEGER NOT NULL DEFAULT 0,
+     cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+     purchase_id INTEGER REFERENCES purchases(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS batches_product_idx ON batches (product_id, expiry_date);
+   CREATE TABLE IF NOT EXISTS purchase_orders (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     supplier_id INTEGER REFERENCES suppliers(id),
+     status TEXT NOT NULL DEFAULT 'request',
+     warehouse_id INTEGER REFERENCES warehouses(id),
+     expected_date DATE,
+     supplier_quote_ref TEXT NOT NULL DEFAULT '',
+     notes TEXT NOT NULL DEFAULT '',
+     subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+     requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     approved_at TIMESTAMPTZ,
+     sent_at TIMESTAMPTZ,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS purchase_order_items (
+     id SERIAL PRIMARY KEY,
+     po_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+     product_id INTEGER NOT NULL REFERENCES products(id),
+     qty INTEGER NOT NULL,
+     unit_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+     received_qty INTEGER NOT NULL DEFAULT 0
+   );
+   ALTER TABLE purchases ADD COLUMN IF NOT EXISTS po_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL;
+   ALTER TABLE purchases ADD COLUMN IF NOT EXISTS due_date DATE;
+   ALTER TABLE purchases ADD COLUMN IF NOT EXISTS returned NUMERIC(12,2) NOT NULL DEFAULT 0;
+   ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS batch_no TEXT NOT NULL DEFAULT '';
+   ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS expiry_date DATE;
+   CREATE TABLE IF NOT EXISTS purchase_returns (
+     id SERIAL PRIMARY KEY,
+     number TEXT NOT NULL UNIQUE,
+     purchase_id INTEGER NOT NULL REFERENCES purchases(id),
+     supplier_id INTEGER REFERENCES suppliers(id),
+     date DATE NOT NULL DEFAULT CURRENT_DATE,
+     subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+     vat NUMERIC(12,2) NOT NULL DEFAULT 0,
+     total NUMERIC(12,2) NOT NULL DEFAULT 0,
+     reason TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS purchase_return_items (
+     id SERIAL PRIMARY KEY,
+     return_id INTEGER NOT NULL REFERENCES purchase_returns(id) ON DELETE CASCADE,
+     purchase_item_id INTEGER,
+     product_id INTEGER NOT NULL REFERENCES products(id),
+     unit_id INTEGER,
+     qty INTEGER NOT NULL,
+     unit_cost NUMERIC(12,2) NOT NULL,
+     vat NUMERIC(12,2) NOT NULL DEFAULT 0,
+     total NUMERIC(12,2) NOT NULL DEFAULT 0
+   );
+   CREATE TABLE IF NOT EXISTS notifications (
+     id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     link TEXT NOT NULL DEFAULT '',
+     kind TEXT NOT NULL DEFAULT 'info',
+     read_at TIMESTAMPTZ,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, read_at);
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,2) NOT NULL DEFAULT 0;
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_base TEXT NOT NULL DEFAULT 'profit';
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS sales_rep_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+   ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved';
+   ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+   ALTER TABLE expenses ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL;`,
 ];

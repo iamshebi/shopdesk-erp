@@ -4,6 +4,7 @@ const TABS = [
   { href: "/hr/attendance", label: "Attendance" },
   { href: "/hr/leave", label: "Leave" },
   { href: "/hr/payroll", label: "Payroll" },
+  { href: "/hr/commissions", label: "Commissions" },
 ];
 export default function HrTabs({ active }: { active: string }) {
   return (

@@ -41,6 +41,11 @@ export interface ShopSettings {
   auto_reminders: boolean;
   reminder_every_days: number;
   couriers: string;
+  expense_approval_limit: number;
+  po_approval_limit: number;
+  books_locked_until: string;
+  fiscal_year_start_month: number;
+  require_product_approval: boolean;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -81,6 +86,11 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   daily_report_email: "",
   auto_reminders: false,
   reminder_every_days: 7,
+  expense_approval_limit: 0,
+  po_approval_limit: 0,
+  books_locked_until: "",
+  fiscal_year_start_month: 1,
+  require_product_approval: false,
   couriers: "Aramex|https://www.aramex.com/track/results?ShipmentNumber={n}\nDHL|https://www.dhl.com/ae-en/home/tracking.html?tracking-id={n}\nEmirates Post|https://www.emiratespost.ae/track?trackno={n}\nOwn driver|",
 };
 

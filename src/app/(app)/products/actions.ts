@@ -9,7 +9,16 @@ import { requireUser, can } from "@/lib/auth";
 import { log } from "@/lib/activity";
 import { str, numf } from "@/lib/util";
 
-const STATUSES = ["active", "draft", "inactive"];
+const STATUSES = ["active", "draft", "inactive", "pending"];
+import { customFields, readCustom } from "@/lib/custom-fields";
+import { getSettings } from "@/lib/settings";
+
+/** When approval is on, staff without approval rights can only submit products for review. */
+async function gateStatus(user: any, status: string) {
+  const s = await getSettings();
+  if (s.require_product_approval && status === "active" && !can(user, "products.approve")) return "pending";
+  return status;
+}
 
 function cleanTags(v: string) {
   return [...new Set(v.split(",").map((t) => t.trim()).filter(Boolean))].join(", ");
@@ -38,6 +47,7 @@ function readProduct(fd: FormData) {
     website_visible: fd.get("website_visible") === "on",
     seo_title: str(fd, "seo_title"),
     seo_description: str(fd, "seo_description"),
+    track_batch: fd.get("track_batch") === "on",
   };
 }
 type ProductData = ReturnType<typeof readProduct>;
@@ -49,6 +59,9 @@ export async function createProduct(fd: FormData) {
   const d = readProduct(fd);
   if (!can(user, "products.cost")) d.cost = 0;
   if (!d.name) redirect("/products/new?err=" + encodeURIComponent("Product name is required"));
+  d.status = await gateStatus(user, d.status);
+  const cf = readCustom(await customFields("products"), fd);
+  if (cf.error) redirect("/products/new?err=" + encodeURIComponent(cf.error));
   const id = await tx(async (t) => {
     const [p] = await t<{ id: number }>(
       `INSERT INTO products (${COLS.join(", ")}, stock_qty) VALUES (${COLS.map((_, i) => `$${i + 1}`).join(", ")}, $${COLS.length + 1}) RETURNING id`,
@@ -57,6 +70,7 @@ export async function createProduct(fd: FormData) {
     const wh = Number(str(fd, "warehouse_id")) || undefined;
     if (!d.track_serial && !d.is_service && opening) await moveQty(t, { productId: p.id, qty: opening, type: "opening", userId: user.id, warehouseId: wh });
     if (!d.sku) await t("UPDATE products SET sku = $2 WHERE id=$1", [p.id, `P${String(p.id).padStart(5, "0")}`]);
+    await t("UPDATE products SET custom=$2 WHERE id=$1", [p.id, JSON.stringify(cf.values)]);
     if (d.track_serial) {
       const imeis = str(fd, "opening_imeis").split(/[\s,]+/).filter(Boolean);
       for (const imei of imeis) {
@@ -79,8 +93,11 @@ export async function updateProduct(fd: FormData) {
   if (!before) redirect("/products");
   const d = readProduct(fd);
   if (!can(user, "products.cost")) d.cost = before.cost;
+  if (d.status !== before.status) d.status = await gateStatus(user, d.status);
+  const cf = readCustom(await customFields("products"), fd);
+  if (cf.error) redirect(`/products/${id}?err=${encodeURIComponent(cf.error)}`);
   const changed = await tx(async (t) => {
-    await t(`UPDATE products SET ${COLS.map((c, i) => `${c}=$${i + 1}`).join(", ")}, updated_at=now() WHERE id=$${COLS.length + 1}`, [...COLS.map((c) => d[c]), id]);
+    await t(`UPDATE products SET ${COLS.map((c, i) => `${c}=$${i + 1}`).join(", ")}, custom=$${COLS.length + 2}, updated_at=now() WHERE id=$${COLS.length + 1}`, [...COLS.map((c) => d[c]), id, JSON.stringify(cf.values)]);
     return recordChanges(t, id, user.id, before, d);
   });
   if (Number(before.price) !== d.price) await log(user.id, "Price changed", `${before.name}: ${before.price} → ${d.price}`, `/products/${id}`);
@@ -137,7 +154,33 @@ export async function bulkProducts(fd: FormData) {
   if (!ids.length) done("Select at least one product first");
   if (op === "labels") redirect(`/print/labels?ids=${ids.join(",")}&copies=${Math.max(1, Math.min(50, Math.round(numf(fd, "copies")) || 1))}`);
   if (op === "export") redirect(`/api/export/products?ids=${ids.join(",")}`);
-  const user = await requireUser(op === "archive" ? "products.edit" : "products.edit");
+  if (op === "delete") {
+    const u = await requireUser("products.approve");
+    let deleted = 0, archived = 0;
+    for (const id of ids) {
+      const used = await one<{ n: number }>(`SELECT (SELECT count(*) FROM sale_items WHERE product_id=$1) + (SELECT count(*) FROM purchase_items WHERE product_id=$1) + (SELECT count(*) FROM order_items WHERE product_id=$1)
+        + (SELECT count(*) FROM units WHERE product_id=$1) + (SELECT count(*) FROM stock_moves WHERE product_id=$1 AND type <> 'opening') + (SELECT count(*) FROM purchase_order_items WHERE product_id=$1) AS n`, [id]);
+      if (Number(used?.n) > 0) { await q("UPDATE products SET active=FALSE, updated_at=now() WHERE id=$1", [id]); archived++; continue; }
+      await tx(async (t) => {
+        for (const tb of ["product_stock", "stock_moves", "product_history", "batches", "stock_transfer_items", "stock_count_items"]) await t(`DELETE FROM ${tb} WHERE product_id=$1`, [id]);
+        await t("DELETE FROM files WHERE kind='product' AND owner_id=$1", [id]);
+        await t("UPDATE products SET parent_id=NULL WHERE parent_id=$1", [id]);
+        await t("DELETE FROM products WHERE id=$1", [id]);
+      });
+      deleted++;
+    }
+    await log(u.id, "Products deleted", `${deleted} deleted, ${archived} archived (had history)`, "/products");
+    revalidatePath("/products");
+    done(`${deleted} deleted${archived ? `, ${archived} archived because they have sales or stock history` : ""}`);
+  }
+  if (op === "approve") {
+    const u = await requireUser("products.approve");
+    await q("UPDATE products SET status='active', updated_at=now() WHERE id = ANY($1::int[]) AND status='pending'", [ids]);
+    await log(u.id, "Products approved", `${ids.length} product(s)`, "/products");
+    revalidatePath("/products");
+    done(`${ids.length} product(s) approved`);
+  }
+  const user = await requireUser("products.edit");
   const rows = await q<any>(`SELECT id, name, ${COLS.join(", ")}, active FROM products WHERE id = ANY($1::int[])`, [ids]);
   let summary = "";
   await tx(async (t) => {
@@ -335,4 +378,66 @@ export async function importProducts(_: unknown, fd: FormData) {
   await log(user.id, "Products imported", `${count} products`, "/products");
   revalidatePath("/products");
   return { error: "", count };
+}
+
+
+/** Creates variants (e.g. colours / sizes) of a product as child products with their own SKU and stock. */
+export async function addVariants(fd: FormData) {
+  const user = await requireUser("products.edit");
+  const id = Number(str(fd, "id"));
+  const parent = await one<any>("SELECT * FROM products WHERE id=$1", [id]);
+  if (!parent) redirect("/products");
+  const rootId = parent.parent_id ?? parent.id;
+  // "Color: Red, Blue | Size: S, M" -> every combination
+  const axes = str(fd, "axes").split("|").map((a) => a.split(":")).filter((a) => a.length === 2)
+    .map(([k, v]) => [k.trim(), v.split(",").map((x) => x.trim()).filter(Boolean)] as [string, string[]]).filter(([k, v]) => k && v.length);
+  if (!axes.length) redirect(`/products/${id}?err=${encodeURIComponent("Write the options like: Color: Red, Blue | Size: S, M")}`);
+  let combos: Record<string, string>[] = [{}];
+  for (const [k, vals] of axes) combos = combos.flatMap((c) => vals.map((v) => ({ ...c, [k]: v })));
+  if (combos.length > 50) redirect(`/products/${id}?err=${encodeURIComponent("That makes more than 50 variants. Split it up.")}`);
+  const price = str(fd, "price") ? numf(fd, "price") : Number(parent.price);
+  const status = await gateStatus(user, "active");
+  let made = 0;
+  await tx(async (t) => {
+    const keep = COLS.filter((c) => !["sku", "barcode", "name", "price", "status"].includes(c));
+    for (const attrs of combos) {
+      const label = Object.values(attrs).join(" / ");
+      const [ex] = await t("SELECT id FROM products WHERE parent_id=$1 AND attributes=$2::jsonb", [rootId, JSON.stringify(attrs)]);
+      if (ex) continue;
+      const [p] = await t<{ id: number }>(
+        `INSERT INTO products (${keep.join(", ")}, name, price, status, parent_id, attributes, stock_qty) SELECT ${keep.join(", ")}, $2, $3, $4, $5, $6, 0 FROM products WHERE id=$1 RETURNING id`,
+        [rootId, `${parent.parent_id ? parent.name.split(" - ")[0] : parent.name} - ${label}`, price, status, rootId, JSON.stringify(attrs)],
+      );
+      const [root] = await t<{ sku: string }>("SELECT sku FROM products WHERE id=$1", [rootId]);
+      await t("UPDATE products SET sku=$2 WHERE id=$1", [p.id, `${root.sku || "P" + rootId}-${Object.values(attrs).map((v) => v.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase()).join("-")}`]);
+      await t("INSERT INTO product_history (product_id, user_id, field, new_value, source) VALUES ($1,$2,'Created',$3,'variant')", [p.id, user.id, `Variant of #${rootId}: ${label}`]);
+      made++;
+    }
+  });
+  await log(user.id, "Variants added", `${made} of #${rootId}`, `/products/${rootId}`);
+  revalidatePath(`/products/${rootId}`);
+  redirect(`/products/${rootId}?saved=1&msg=${encodeURIComponent(`${made} variant(s) created`)}`);
+}
+
+export async function saveRelated(fd: FormData) {
+  const user = await requireUser("products.edit");
+  const id = Number(str(fd, "id"));
+  const codes = str(fd, "related").split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+  const ids: number[] = [];
+  for (const c of codes) {
+    const p = await one<{ id: number }>("SELECT id FROM products WHERE id<>$2 AND ((sku<>'' AND lower(sku)=lower($1)) OR lower(name)=lower($1)) LIMIT 1", [c, id]);
+    if (p && !ids.includes(p.id)) ids.push(p.id);
+  }
+  await q("UPDATE products SET related_ids=$2, updated_at=now() WHERE id=$1", [id, ids]);
+  await log(user.id, "Related products set", `#${id}: ${ids.length}`, `/products/${id}`);
+  redirect(`/products/${id}?saved=1`);
+}
+
+export async function approveProduct(fd: FormData) {
+  const user = await requireUser("products.approve");
+  const id = Number(str(fd, "id"));
+  const r = await one<any>("UPDATE products SET status=$2, updated_at=now() WHERE id=$1 RETURNING name", [id, str(fd, "decision") === "reject" ? "draft" : "active"]);
+  await q("INSERT INTO product_history (product_id, user_id, field, old_value, new_value) VALUES ($1,$2,'Status','pending',$3)", [id, user.id, str(fd, "decision") === "reject" ? "draft (rejected)" : "active (approved)"]);
+  await log(user.id, str(fd, "decision") === "reject" ? "Product rejected" : "Product approved", r?.name ?? "", `/products/${id}`);
+  redirect(`/products/${id}?saved=1`);
 }

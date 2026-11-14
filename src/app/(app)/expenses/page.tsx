@@ -1,7 +1,8 @@
 import { q } from "@/lib/db";
 import { requireUser, can } from "@/lib/auth";
 import { fmtDate, num, todayDubai, methodLabel } from "@/lib/util";
-import { PageHeader, Empty } from "@/components/ui";
+import Link from "next/link";
+import { PageHeader, Empty, Badge } from "@/components/ui";
 import Submit from "@/components/submit";
 import { addExpense, deleteExpense } from "./actions";
 
@@ -11,14 +12,15 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const user = await requireUser("expenses");
   const sp = await searchParams;
   const month = sp.month || todayDubai().slice(0, 7);
-  const rows = await q<any>("SELECT e.*, u.name staff FROM expenses e LEFT JOIN users u ON u.id=e.created_by WHERE to_char(e.date,'YYYY-MM') = $1 ORDER BY e.date DESC, e.id DESC", [month]);
-  const byCat = await q<{ category: string; total: number }>("SELECT category, sum(total) total FROM expenses WHERE to_char(date,'YYYY-MM') = $1 GROUP BY 1 ORDER BY 2 DESC", [month]);
-  const total = rows.reduce((a, r) => a + r.total, 0);
+  const rows = await q<any>("SELECT e.*, u.name staff, (SELECT count(*)::int FROM files f WHERE f.kind='expense' AND f.owner_id=e.id) nfiles FROM expenses e LEFT JOIN users u ON u.id=e.created_by WHERE to_char(e.date,'YYYY-MM') = $1 ORDER BY e.date DESC, e.id DESC", [month]);
+  const byCat = await q<{ category: string; total: number }>("SELECT category, sum(total) total FROM expenses WHERE to_char(date,'YYYY-MM') = $1 AND status='approved' GROUP BY 1 ORDER BY 2 DESC", [month]);
+  const total = rows.filter((r) => r.status === "approved").reduce((a, r) => a + r.total, 0);
   return (
     <div>
       <PageHeader title="Expenses" subtitle={`${month} · total ${num(total)}`}>
         <form><input type="month" name="month" defaultValue={month} className="input w-44" /></form>
       </PageHeader>
+      {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
       <form action={addExpense} className="card mb-6 grid gap-3 p-5 sm:grid-cols-7">
         <input type="date" name="date" defaultValue={todayDubai()} className="input" required />
         <input name="category" list="expcats" placeholder="Category" className="input" required />
@@ -39,7 +41,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
               <tbody>
                 {rows.map((e) => (
                   <tr key={e.id}>
-                    <td>{fmtDate(e.date)}</td><td>{e.category}</td><td className="text-slate-500">{e.description}</td><td className="text-slate-500">{methodLabel(e.method)}</td>
+                    <td>{fmtDate(e.date)}</td><td><Link href={`/expenses/${e.id}`} className="hover:text-accent">{e.category}</Link> {e.status !== "approved" && <Badge tone={e.status === "pending" ? "amber" : "red"}>{e.status}</Badge>}{e.nfiles > 0 && <span className="ml-1 text-xs text-slate-400">📎{e.nfiles}</span>}</td><td className="text-slate-500">{e.description}</td><td className="text-slate-500">{methodLabel(e.method)}</td>
                     <td className="text-right tabular-nums">{num(e.vat)}</td><td className="text-right tabular-nums font-medium">{num(e.total)}</td>
                     <td className="text-right">{can(user, "expenses.delete") && <form action={deleteExpense}><input type="hidden" name="id" value={e.id} /><Submit className="btn-ghost btn-sm" confirm="Delete this expense?">Delete</Submit></form>}</td>
                   </tr>

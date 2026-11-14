@@ -67,6 +67,7 @@ export const PAYMENT_METHODS = [
   { id: "tabby", label: "Tabby" },
   { id: "tamara", label: "Tamara" },
   { id: "bank", label: "Bank transfer" },
+  { id: "store_credit", label: "Store credit" },
   { id: "credit", label: "On credit" },
 ] as const;
 

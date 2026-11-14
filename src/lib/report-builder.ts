@@ -23,14 +23,14 @@ export const DATASETS: Record<string, { label: string; from: string; date: strin
     metrics: { amount: ["Amount", "sum(CASE WHEN s.type='credit_note' THEN -pm.amount ELSE pm.amount END)"], count: ["Payments", "count(*)"] },
   },
   expenses: {
-    label: "Expenses", from: "expenses e", date: "e.date",
+    label: "Expenses", from: "(SELECT * FROM expenses WHERE status='approved') e", date: "e.date",
     dims: { month: ["Month", "to_char(e.date,'YYYY-MM')"], day: ["Day", "to_char(e.date,'YYYY-MM-DD')"], category: ["Category", "e.category"], method: ["Paid by", "e.method"] },
     metrics: { amount: ["Amount excl. VAT", "sum(e.amount)"], vat: ["VAT", "sum(e.vat)"], total: ["Total", "sum(e.total)"], count: ["Entries", "count(*)"] },
   },
   purchases: {
     label: "Purchases", from: "purchases pu LEFT JOIN suppliers su ON su.id=pu.supplier_id", date: "pu.date",
     dims: { month: ["Month", "to_char(pu.date,'YYYY-MM')"], supplier: ["Supplier", "COALESCE(su.name,'—')"] },
-    metrics: { total: ["Total", "sum(pu.total)"], vat: ["VAT", "sum(pu.vat)"], unpaid: ["Unpaid", "sum(pu.total-pu.paid)"], count: ["Bills", "count(*)"] },
+    metrics: { total: ["Total", "sum(pu.total)"], vat: ["VAT", "sum(pu.vat)"], unpaid: ["Unpaid", "sum(pu.total-pu.paid-pu.returned)"], count: ["Bills", "count(*)"] },
   },
   stock: {
     label: "Stock movements", from: "stock_moves m JOIN products p ON p.id=m.product_id LEFT JOIN warehouses w ON w.id=m.warehouse_id", date: D("m.created_at"),

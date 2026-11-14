@@ -15,6 +15,12 @@ export async function receivePayment(fd: FormData) {
   if (!row) return;
   const amount = r2(Math.min(numf(fd, "amount"), row.outstanding));
   if (amount <= 0) return;
+  if (str(fd, "method") === "store_credit") {
+    const { storeCreditBalance } = await import("@/lib/store-credit");
+    const sale = await one<{ customer_id: number | null }>("SELECT customer_id FROM sales WHERE id=$1", [id]);
+    const bal = sale?.customer_id ? await storeCreditBalance(q, sale.customer_id) : 0;
+    if (amount > bal + 0.004) redirect(`/sales/${id}?err=${encodeURIComponent(`Store credit available is only ${bal.toFixed(2)}`)}`);
+  }
   await tx(async (t) => {
     await t("INSERT INTO payments (sale_id, method, amount, reference, created_by) VALUES ($1,$2,$3,$4,$5)", [id, str(fd, "method"), amount, str(fd, "reference"), user.id]);
     await t("UPDATE sales SET paid = paid + $1 WHERE id=$2", [amount, id]);
@@ -35,7 +41,7 @@ export async function returnItems(fd: FormData) {
   let cnId: number;
   try {
     cnId = await tx(async (t) => {
-      const cn = await createReturn(t, s, id, lines, { method: str(fd, "method"), reason: str(fd, "reason") }, user.id);
+      const cn = await createReturn(t, s, id, lines, { method: fd.get("exchange") === "1" ? "store_credit" : str(fd, "method"), reason: str(fd, "reason") || "Exchange" }, user.id);
       const [r] = await t<{ number: string; total: number }>("SELECT number, total FROM sales WHERE id=$1", [cn]);
       await log(user.id, "Return / refund", `${r.number} · ${r.total.toFixed(2)} · ${str(fd, "reason")}`, `/sales/${cn}`, t);
       return cn;
@@ -45,6 +51,10 @@ export async function returnItems(fd: FormData) {
     throw e;
   }
   revalidatePath("/sales");
+  if (fd.get("exchange") === "1") {
+    const c = await one<{ customer_id: number }>("SELECT customer_id FROM sales WHERE id=$1", [cnId]);
+    redirect(`/pos?customer=${c?.customer_id}&exchange=${cnId}`);
+  }
   redirect(`/sales/${cnId}?new=1`);
 }
 

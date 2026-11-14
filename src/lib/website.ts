@@ -48,10 +48,11 @@ export async function commitCatalog(catalog: Catalog, sha: string, message: stri
 
 export const slug = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120) || "item";
 
-export interface ErpProduct { id: number; web_id: string; name: string; brand: string; category: string; description: string; specs: string; price: number; discount_price: number | null; status: string; active: boolean; website_visible: boolean; is_service: boolean; stock: number | null }
+export interface ErpProduct { id: number; web_id: string; name: string; brand: string; category: string; description: string; specs: string; price: number; discount_price: number | null; status: string; active: boolean; website_visible: boolean; is_service: boolean; stock: number | null; image_url?: string }
 
 /** Builds the new catalogue from the current one plus the ERP products. Returns it with a change list. */
-export function buildCatalog(current: Catalog, products: ErpProduct[], showPrices: boolean) {
+export function buildCatalog(current: Catalog, products: ErpProduct[], showPrices: boolean, imgBase = "") {
+  const img = (p: ErpProduct) => (!p.image_url ? "" : p.image_url.startsWith("/api/files/") ? (imgBase ? imgBase + p.image_url : "") : p.image_url);
   const cat: Catalog = JSON.parse(JSON.stringify(current));
   const byId = new Map(cat.products.map((p, i) => [p.id, i]));
   const changes: string[] = [];
@@ -86,6 +87,7 @@ export function buildCatalog(current: Catalog, products: ErpProduct[], showPrice
       if (out) merged.st = old.st === "soon" ? "soon" : "out"; else delete merged.st;
       if (showPrices && price > 0) merged.pr = price; else if (showPrices) delete merged.pr;
       if (show) delete merged.h; else merged.h = 1;
+      if (!old.i && img(p)) merged.i = img(p);
       if (JSON.stringify(old) !== JSON.stringify(merged)) {
         const what: string[] = [];
         if (old.n !== merged.n) what.push("name");
@@ -94,6 +96,7 @@ export function buildCatalog(current: Catalog, products: ErpProduct[], showPrice
         if (old.c !== merged.c) what.push("category");
         if ((old.st ?? "") !== (merged.st ?? "")) what.push(merged.st ? "out of stock" : "back in stock");
         if ((old.pr ?? 0) !== (merged.pr ?? 0)) what.push("price");
+        if ((old.i ?? "") !== (merged.i ?? "")) what.push("image");
         if (!!old.h !== !!merged.h) what.push(merged.h ? "hidden" : "shown");
         changes.push(`Updated ${p.brand ? p.brand + " " : ""}${p.name}: ${what.join(", ")}`);
         cat.products[i] = merged;
@@ -107,6 +110,7 @@ export function buildCatalog(current: Catalog, products: ErpProduct[], showPrice
       if (next.d) wp.d = next.d;
       if (out) wp.st = "out";
       if (showPrices && price > 0) wp.pr = price;
+      if (img(p)) wp.i = img(p);
       cat.products.push(wp);
       byId.set(id, cat.products.length - 1);
       newLinks.push({ id: p.id, web_id: id });

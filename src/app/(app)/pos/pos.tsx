@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Trash2, User, X } from "lucide-react";
 import ProductPicker from "@/components/product-picker";
-import { availableUnits, searchCustomers, type ProductHit } from "../lookup-actions";
+import { availableUnits, searchCustomers, customerTermsFor, type ProductHit } from "../lookup-actions";
+import { priceFor, type CustomerTerms } from "@/lib/customer-pricing";
 import { checkout, previewCoupon } from "./actions";
 import { PAYMENT_METHODS } from "@/lib/util";
 
@@ -24,12 +25,22 @@ const n = (v: string | number) => {
 };
 const f2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
+export default function Pos({ vatRate, inclusive, currency, preset, perms, presetCustomer, exchangeNote }: {
   vatRate: number; inclusive: boolean; currency: string; preset: ProductHit | null; perms: { price: boolean; discount: boolean; credit: boolean };
+  presetCustomer?: { id: number; name: string; phone: string; trn: string; address: string; terms: CustomerTerms } | null; exchangeNote?: string;
 }) {
   const router = useRouter();
   const [lines, setLines] = useState<Line[]>([]);
-  const [customer, setCustomer] = useState({ id: null as number | null, name: "", phone: "", trn: "", address: "" });
+  const [customer, setCustomer] = useState(presetCustomer ? { id: presetCustomer.id as number | null, name: presetCustomer.name, phone: presetCustomer.phone, trn: presetCustomer.trn, address: presetCustomer.address } : { id: null as number | null, name: "", phone: "", trn: "", address: "" });
+  const [terms, setTerms] = useState<CustomerTerms | null>(presetCustomer?.terms ?? null);
+  async function pickCustomer(c: { id: number; name: string; phone: string; trn: string; address: string }) {
+    setCustomer(c);
+    const tm = await customerTermsFor(c.id);
+    setTerms(tm);
+    setLines((ls) => ls.map((l) => (l.unit_id ? l : { ...l, price: String(priceFor(tm, l.product.id, Number(l.product.price))) })));
+    if (tm.credit > 0) setPays([{ method: "store_credit", amount: "" }]);
+  }
+  useEffect(() => { if (presetCustomer?.terms.credit) setPays([{ method: "store_credit", amount: "" }]); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [custHits, setCustHits] = useState<any[]>([]);
   const [showB2B, setShowB2B] = useState(false);
   const [pays, setPays] = useState<{ method: string; amount: string }[]>([{ method: "cash", amount: "" }]);
@@ -50,12 +61,12 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
         setError(`${p.name}: no IMEI in stock`);
         return;
       }
-      setLines((ls) => [...ls, { key: crypto.randomUUID(), product: p, unit_id: chosen?.id ?? null, imei: chosen?.imei ?? "", units: free, qty: 1, price: String(chosen?.price ?? p.price), discount: "" }]);
+      setLines((ls) => [...ls, { key: crypto.randomUUID(), product: p, unit_id: chosen?.id ?? null, imei: chosen?.imei ?? "", units: free, qty: 1, price: String(chosen?.price ?? priceFor(terms, p.id, Number(p.price))), discount: "" }]);
     } else {
       setLines((ls) => {
         const ex = ls.find((l) => l.product.id === p.id && !p.track_serial);
         if (ex) return ls.map((l) => (l === ex ? { ...l, qty: l.qty + 1 } : l));
-        return [...ls, { key: crypto.randomUUID(), product: p, unit_id: null, imei: "", units: [], qty: 1, price: String(p.price), discount: "" }];
+        return [...ls, { key: crypto.randomUUID(), product: p, unit_id: null, imei: "", units: [], qty: 1, price: String(priceFor(terms, p.id, Number(p.price))), discount: "" }];
       });
     }
   }
@@ -177,7 +188,7 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
         <div className="card space-y-3 p-5">
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-2 font-semibold"><User size={16} /> Customer</h2>
-            {customer.id && <button className="text-xs text-slate-400 hover:text-slate-600" onClick={() => setCustomer({ id: null, name: "", phone: "", trn: "", address: "" })}><X size={14} /></button>}
+            {customer.id && <button className="text-xs text-slate-400 hover:text-slate-600" onClick={() => { setCustomer({ id: null, name: "", phone: "", trn: "", address: "" }); setTerms(null); }}><X size={14} /></button>}
           </div>
           <div className="relative grid grid-cols-2 gap-2">
             <input className="input" placeholder="Name" value={customer.name} onChange={(e) => setCustomer({ ...customer, id: null, name: e.target.value })} />
@@ -186,13 +197,21 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
               <div className="absolute top-11 z-10 w-full rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
                 {custHits.map((c) => (
                   <button key={c.id} className="flex w-full justify-between rounded-lg px-3 py-1.5 text-left text-sm hover:bg-slate-100"
-                    onClick={() => { setCustomer({ id: c.id, name: c.name, phone: c.phone, trn: c.trn, address: c.address }); setCustHits([]); if (c.trn) setShowB2B(true); }}>
+                    onClick={() => { pickCustomer({ id: c.id, name: c.name, phone: c.phone, trn: c.trn, address: c.address }); setCustHits([]); if (c.trn) setShowB2B(true); }}>
                     <span>{c.name}</span><span className="text-slate-400">{c.phone}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
+          {exchangeNote && <div className="rounded-lg bg-blue-50 p-2 text-xs text-blue-700">{exchangeNote}</div>}
+          {terms && customer.id && (terms.credit > 0 || terms.discount_pct > 0 || Object.keys(terms.prices).length > 0) && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {terms.credit > 0 && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">Store credit {f2(terms.credit)}</span>}
+              {terms.discount_pct > 0 && <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700">{terms.discount_pct}% customer discount</span>}
+              {Object.keys(terms.prices).length > 0 && <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700">Special prices</span>}
+            </div>
+          )}
           {showB2B ? (
             <div className="grid gap-2">
               <input className="input" placeholder="Customer TRN" value={customer.trn} onChange={(e) => setCustomer({ ...customer, trn: e.target.value })} />
@@ -219,7 +238,7 @@ export default function Pos({ vatRate, inclusive, currency, preset, perms }: {
             {pays.map((p, i) => (
               <div key={i} className="flex gap-2">
                 <select className="input w-36" value={p.method} onChange={(e) => setPays((ps) => ps.map((x, j) => (j === i ? { ...x, method: e.target.value } : x)))}>
-                  {PAYMENT_METHODS.filter((m) => perms.credit || m.id !== "credit").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  {PAYMENT_METHODS.filter((m) => (perms.credit || m.id !== "credit") && (m.id !== "store_credit" || (terms?.credit ?? 0) > 0)).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
                 <input className="input text-right" inputMode="decimal" placeholder={pays.length === 1 ? f2(totals.total) : "0.00"} value={p.amount}
                   onChange={(e) => setPays((ps) => ps.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} disabled={p.method === "credit"} />

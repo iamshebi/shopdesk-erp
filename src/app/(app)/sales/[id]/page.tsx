@@ -146,10 +146,11 @@ export default async function SalePage({ params, searchParams }: { params: Promi
             ))}
             <div className="grid gap-2 sm:grid-cols-2">
               <select name="method" className="input">
-                {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.id === "credit" ? "Reduce balance due" : `Refund by ${m.label}`}</option>)}
+                {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.id === "credit" ? "Reduce balance due" : m.id === "store_credit" ? "Give store credit / exchange" : `Refund by ${m.label}`}</option>)}
               </select>
               <input name="reason" placeholder="Reason for return" className="input" required />
             </div>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="exchange" value="1" /> Exchange: give store credit and open the till for the replacement item</label>
             <Submit className="btn-danger" confirm="Create a credit note and put these items back in stock?">Create credit note</Submit>
           </form>
         </details>

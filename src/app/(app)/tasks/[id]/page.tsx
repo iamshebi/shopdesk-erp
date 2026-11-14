@@ -8,6 +8,7 @@ import { PageHeader, Badge } from "@/components/ui";
 import Submit from "@/components/submit";
 import TaskForm from "@/components/task-form";
 import { saveTask, moveTask, commentTask, deleteTask } from "../actions";
+import Attachments from "@/components/attachments";
 
 export default async function TaskPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   await requireUser("tasks");
@@ -31,6 +32,7 @@ export default async function TaskPage({ params, searchParams }: { params: Promi
         <form action={deleteTask} className="ml-auto"><input type="hidden" name="id" value={t.id} /><Submit className="btn-danger btn-sm">Delete</Submit></form>
       </div>
       <div className="card mb-6 p-6"><TaskForm action={saveTask} t={t} projects={projects} users={users} /></div>
+      <div className="mb-6"><Attachments kind="task" ownerId={t.id} back={`/tasks/${t.id}`} /></div>
       <div className="card p-5">
         <h3 className="mb-3 font-semibold">Comments</h3>
         {comments.map((c) => <div key={c.id} className="mb-3 text-sm"><div className="text-xs text-slate-400">{c.name ?? "—"} · {fmtDate(c.created_at, true)}</div><div className="whitespace-pre-wrap">{c.body}</div></div>)}

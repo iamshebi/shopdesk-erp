@@ -64,6 +64,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader title="Products & stock" subtitle={`${totals[0].items} products${showCost ? ` · stock value ${s.currency} ${num(totals[0].value)} at cost` : ""}`}>
+        <Link href="/products/catalog" className="btn-ghost">Categories &amp; brands</Link>
         {can(user, "products.import") && <Link href="/products/import" className="btn-ghost"><Upload size={16} /> Import</Link>}
         {canEdit && <Link href="/products/new" className="btn-primary"><Plus size={16} /> Add product</Link>}
       </PageHeader>
@@ -72,7 +73,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         <input name="q" defaultValue={term} placeholder="Search name, brand, SKU, tag, barcode or IMEI…" className="input max-w-sm" />
         <select name="cat" defaultValue={sp.cat ?? ""} className="input w-44"><option value="">All categories</option>{cats.map((c) => <option key={c.v} value={c.v}>{c.v} ({c.n})</option>)}</select>
         <select name="brand" defaultValue={sp.brand ?? ""} className="input w-40"><option value="">All brands</option>{brands.map((b) => <option key={b.v} value={b.v}>{b.v} ({b.n})</option>)}</select>
-        <select name="status" defaultValue={sp.status ?? ""} className="input w-36"><option value="">Any status</option><option value="active">Active</option><option value="draft">Draft</option><option value="inactive">Inactive</option></select>
+        <select name="status" defaultValue={sp.status ?? ""} className="input w-36"><option value="">Any status</option><option value="active">Active</option><option value="draft">Draft</option><option value="inactive">Inactive</option><option value="pending">Awaiting approval</option></select>
         {tagRows.length > 0 && <select name="tag" defaultValue={sp.tag ?? ""} className="input w-36"><option value="">Any tag</option>{tagRows.map((t) => <option key={t.v}>{t.v}</option>)}</select>}
         <select name="f" defaultValue={sp.f ?? ""} className="input w-36"><option value="">All stock</option><option value="in">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
         <select name="sort" defaultValue={sort} className="input w-44">
@@ -88,7 +89,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       <form action={bulkProducts}>
         <input type="hidden" name="back" value={backUrl} />
-        <BulkBar categories={cats.map((c) => c.v)} brands={brands.map((b) => b.v)} canEdit={canEdit} canExport={can(user, "data") || canEdit} />
+        <BulkBar categories={cats.map((c) => c.v)} brands={brands.map((b) => b.v)} canEdit={canEdit} canExport={can(user, "data") || canEdit} canApprove={can(user, "products.approve")} />
         <div className="card overflow-x-auto">
           {rows.length === 0 ? (
             <Empty>{total === 0 && !term && !sp.cat ? "No products yet. Add one or import your list from Excel/CSV." : "No products match these filters."}</Empty>

@@ -16,7 +16,7 @@ export default async function DayClose({ searchParams }: { searchParams: Promise
   const ins = await q<any>(`SELECT pm.method, sum(pm.amount) v FROM payments pm JOIN sales s ON s.id=pm.sale_id WHERE s.type='invoice' AND ${L("pm.created_at")} GROUP BY 1 ORDER BY 2 DESC`, [day]);
   const refunds = await q<any>(`SELECT pm.method, sum(pm.amount) v FROM payments pm JOIN sales s ON s.id=pm.sale_id WHERE s.type='credit_note' AND ${L("pm.created_at")} GROUP BY 1`, [day]);
   const buy = await q<any>(`SELECT payment_method method, sum(price_paid) v FROM buybacks WHERE ${L("created_at")} GROUP BY 1`, [day]);
-  const exps = await q<any>("SELECT method, sum(total) v FROM expenses WHERE date = $1 GROUP BY 1", [day]);
+  const exps = await q<any>("SELECT method, sum(total) v FROM expenses WHERE status='approved' AND date = $1 GROUP BY 1", [day]);
   const sup = await q<any>(`SELECT method, sum(amount) v FROM supplier_payments WHERE ${L("created_at")} GROUP BY 1`, [day]);
   const sales = await one<any>(`SELECT count(*) FILTER (WHERE type='invoice')::int n, COALESCE(sum(CASE WHEN type='invoice' THEN total ELSE -total END),0) v, COALESCE(sum(CASE WHEN type='invoice' THEN vat ELSE -vat END),0) vat FROM sales s WHERE ${L("s.date")}`, [day]);
   const methods = Array.from(new Set([...ins, ...refunds, ...buy, ...exps, ...sup].map((r) => r.method)));

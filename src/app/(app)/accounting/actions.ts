@@ -32,6 +32,8 @@ export async function saveJournal(fd: FormData) {
   await ensureLedger();
   const date = str(fd, "date");
   const memo = str(fd, "memo");
+  const locked = await (await import("@/lib/books")).lockedMessage(date);
+  if (locked) redirect(`/accounting/journal?err=${encodeURIComponent(locked)}`);
   let lines: { account_id: number; debit: number; credit: number; memo: string }[] = [];
   try {
     lines = (JSON.parse(str(fd, "lines") || "[]") as any[]).map((l) => ({ account_id: Number(l.account_id), debit: r2(Number(l.debit) || 0), credit: r2(Number(l.credit) || 0), memo: String(l.memo ?? "") }))

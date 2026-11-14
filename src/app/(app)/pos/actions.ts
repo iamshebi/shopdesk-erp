@@ -15,6 +15,8 @@ export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id
   const notes: string[] = [];
 
   // Enforce price / discount permissions on the server, whatever the browser sent.
+  const { customerTerms, priceFor } = await import("@/lib/customer-pricing");
+  const terms = payload.customer.id ? await customerTerms(q, payload.customer.id) : null;
   for (const l of payload.lines) {
     if (!l.product_id) continue;
     const [p] = await q<{ name: string; price: number }>("SELECT name, price FROM products WHERE id=$1", [l.product_id]);
@@ -23,6 +25,7 @@ export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id
       const [u] = await q<{ price: number | null }>("SELECT price FROM units WHERE id=$1", [l.unit_id]);
       if (u?.price) list = u.price;
     }
+    if (!l.unit_id) list = priceFor(terms, l.product_id, list);
     if (!canPrice) l.unit_price = list;
     else if (Math.abs(l.unit_price - list) > 0.004) notes.push(`${p?.name}: price ${num(list)} → ${num(l.unit_price)}`);
     if (!canDiscount) l.discount = 0;

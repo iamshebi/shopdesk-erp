@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
  * Bulk-action toolbar for a table of checkboxes named "ids" inside the same <form>.
  * Shows when at least one row is ticked; each action submits the form with op=<action>.
  */
-export default function BulkBar({ categories, brands, canEdit, canExport }: { categories: string[]; brands: string[]; canEdit: boolean; canExport: boolean }) {
+export default function BulkBar({ categories, brands, canEdit, canExport, canApprove }: { categories: string[]; brands: string[]; canEdit: boolean; canExport: boolean; canApprove?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [count, setCount] = useState(0);
   const [panel, setPanel] = useState("");
@@ -38,6 +38,8 @@ export default function BulkBar({ categories, brands, canEdit, canExport }: { ca
         {btn("labels", "Print labels")}
         {canExport && go("export", "Export", undefined, "btn-ghost btn-sm")}
         {canEdit && go("archive", "Archive", "Archive {n} products? They disappear from sale and lists, but their history is kept and you can restore them.", "btn-danger btn-sm")}
+        {canApprove && go("approve", "Approve", undefined, "btn-ghost btn-sm")}
+        {canApprove && go("delete", "Delete", "Permanently delete {n} products? Products with sales, purchases or stock history are archived instead, so no records are lost.", "btn-danger btn-sm")}
       </div>
       {panel && (
         <div className="card mt-2 flex flex-wrap items-end gap-2 p-3 shadow-lg">

@@ -21,7 +21,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Prom
             COALESCE(sum(${SIGN} * vat),0) vat, COALESCE(sum(${SIGN} * subtotal),0) net, COALESCE(sum(${SIGN} * cost),0) cost,
             COALESCE(sum(discount) FILTER (WHERE type='invoice'),0) discount, count(*) FILTER (WHERE type='invoice')::int n
      FROM sales s WHERE ${D} BETWEEN $1 AND $2`, P);
-  const exp = await one<{ v: number }>("SELECT COALESCE(sum(amount),0) v FROM expenses WHERE date BETWEEN $1 AND $2", P);
+  const exp = await one<{ v: number }>("SELECT COALESCE(sum(amount),0) v FROM expenses WHERE status='approved' AND date BETWEEN $1 AND $2", P);
   const gp = tot.net - tot.cost;
   const np = gp - (exp?.v ?? 0);
   const byCat = await q<any>(
@@ -40,7 +40,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Prom
      FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE ${D} BETWEEN $1 AND $2 AND si.product_id IS NOT NULL
      GROUP BY 1,2 ORDER BY 4 DESC LIMIT 15`, P);
   const recv = await one<{ v: number }>(`SELECT COALESCE(sum(GREATEST(${OUTSTANDING_SQL},0)),0) v FROM sales s WHERE s.type='invoice'`);
-  const pay = await one<{ v: number }>("SELECT COALESCE(sum(total - paid),0) v FROM purchases");
+  const pay = await one<{ v: number }>("SELECT COALESCE(sum(total - paid - returned),0) v FROM purchases");
   const buy = await one<{ v: number; n: number }>("SELECT COALESCE(sum(price_paid),0) v, count(*)::int n FROM buybacks WHERE (created_at AT TIME ZONE 'Asia/Dubai')::date BETWEEN $1 AND $2", P);
 
   return (

@@ -27,6 +27,8 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
       { key: "tasks", label: "Tasks & projects" },
       { key: "marketing", label: "Coupons & loyalty points" },
       { key: "shipping", label: "Shipping & deliveries" },
+      { key: "purchases.approve", label: "Approve purchase requests & orders" },
+      { key: "expenses.approve", label: "Approve expenses over the limit" },
       { key: "integrations", label: "Integrations: API keys, webhooks, email, payments, automation" },
     ],
   },
@@ -35,6 +37,7 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
     perms: [
       { key: "products.view", label: "View stock" },
       { key: "products.edit", label: "Add & edit products and prices" },
+      { key: "products.approve", label: "Approve new products & delete products" },
       { key: "products.cost", label: "See cost prices & profit" },
       { key: "stock.adjust", label: "Adjust stock, add IMEIs, write off" },
       { key: "products.import", label: "Import products from Excel / CSV" },

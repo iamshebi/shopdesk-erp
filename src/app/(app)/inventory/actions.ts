@@ -190,3 +190,10 @@ async function applyCount(id: number) {
   revalidatePath("/inventory");
   back(`/inventory/counts/${id}`, `Applied. ${adjusted} product(s) corrected.${flagged ? ` ${flagged} IMEI product(s) differ: check them unit by unit.` : ""}`);
 }
+
+export async function setLocation(fd: FormData) {
+  await requireUser("stock.adjust");
+  const pid = Number(str(fd, "product_id")), wid = Number(str(fd, "warehouse_id"));
+  await q("INSERT INTO product_stock (product_id, warehouse_id, qty, location) VALUES ($1,$2,0,$3) ON CONFLICT (product_id, warehouse_id) DO UPDATE SET location=$3", [pid, wid, str(fd, "location")]);
+  revalidatePath(`/products/${pid}`);
+}

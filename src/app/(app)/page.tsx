@@ -39,7 +39,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
        FROM sales s WHERE ${D} BETWEEN $1 AND $2`,
       [f, t2],
     );
-  const exp = (f: string, t2: string) => one<{ v: number }>("SELECT COALESCE(sum(amount),0) v FROM expenses WHERE date BETWEEN $1 AND $2", [f, t2]);
+  const exp = (f: string, t2: string) => one<{ v: number }>("SELECT COALESCE(sum(amount),0) v FROM expenses WHERE status='approved' AND date BETWEEN $1 AND $2", [f, t2]);
   const [t, prev, e, ePrev] = await Promise.all([sum(from, to), sum(prevFrom, prevTo), exp(from, to), exp(prevFrom, prevTo)]);
   const byMonth = len > 62;
   const days = await q<{ d: string; v: number }>(

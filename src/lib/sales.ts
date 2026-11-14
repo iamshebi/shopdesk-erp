@@ -1,9 +1,10 @@
 import "server-only";
-import { moveQty, moveUnit } from "./inventory";
+import { moveQty, moveUnit, moveBatches } from "./inventory";
 import { Exec, nextNumber } from "./db";
 import { ShopSettings } from "./settings";
 import { lineVat, r2 } from "./util";
 import { checkCoupon, CouponError, earnPoints } from "./marketing";
+import { storeCreditBalance } from "./store-credit";
 
 export interface SaleLineInput {
   product_id: number | null; // null = free-text line (e.g. repair service)
@@ -155,6 +156,12 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
       throw new SaleError(`${c.name} would owe ${r2(Number(c.owes) + total - paid).toFixed(2)}, over their credit limit of ${Number(c.credit_limit).toFixed(2)}. Take more payment now.`);
     }
   }
+  const sc = r2(pays.filter((p) => p.method === "store_credit").reduce((a, p) => a + p.amount, 0));
+  if (sc > 0) {
+    if (!customerId) throw new SaleError("Choose the customer to use their store credit");
+    const bal = await storeCreditBalance(t, customerId);
+    if (sc > bal + 0.004) throw new SaleError(`Store credit available is only ${bal.toFixed(2)}`);
+  }
   const number = await nextNumber(t, "invoice", s.invoice_prefix || "INV-");
   const [sale] = await t<{ id: number }>(
     `INSERT INTO sales (number, type, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, discount, vat, total, cost, paid, notes, repair_id, created_by, coupon_code, due_date)
@@ -173,6 +180,7 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
       await moveUnit(t, { unitId: c.unitId, productId: c.product_id!, qty: -1, type: "sale", ref: number, userId: input.userId });
     } else if (c.product_id) {
       await moveQty(t, { productId: c.product_id, qty: -c.qty, type: "sale", ref: number, userId: input.userId });
+      await moveBatches(t, c.product_id, -c.qty);
     }
   }
   for (const p of pays) {
@@ -223,6 +231,7 @@ export async function createReturn(
   if (refund.method === "credit" && applied < total) throw new SaleError(`Only ${outstanding.toFixed(2)} is outstanding on this invoice — refund the rest in cash/card`);
   const refunded = r2(total - applied);
 
+  if (refund.method === "store_credit" && !orig.customer_id) throw new SaleError("Store credit needs a named customer on the invoice");
   const number = await nextNumber(t, "credit_note", "CN-");
   const [cn] = await t<{ id: number }>(
     `INSERT INTO sales (number, type, ref_sale_id, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, vat, total, cost, paid, notes, created_by)
@@ -240,6 +249,7 @@ export async function createReturn(
       await moveUnit(t, { unitId: p.it.unit_id, productId: p.it.product_id, qty: 1, type: "return", ref: number, userId });
     } else if (p.it.product_id && !p.it.is_service) {
       await moveQty(t, { productId: p.it.product_id, qty: p.qty, type: "return", ref: number, userId });
+      await moveBatches(t, p.it.product_id, p.qty);
     }
   }
   if (refunded > 0) {

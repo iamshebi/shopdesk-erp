@@ -14,6 +14,7 @@ export interface ProductHit {
   cost: number;
   track_serial: boolean;
   is_service: boolean;
+  track_batch?: boolean;
   stock: number | null;
   match_unit?: { id: number; imei: string; cost: number; margin_scheme: boolean; price: number | null } | null;
 }
@@ -22,7 +23,7 @@ export async function searchProducts(term: string): Promise<ProductHit[]> {
   await requireUser();
   const t = term.trim();
   if (!t) {
-    return q<ProductHit>(`SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, ${STOCK_SQL} AS stock
+    return q<ProductHit>(`SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, p.track_batch, ${STOCK_SQL} AS stock
       FROM products p WHERE p.active AND p.status = 'active' ORDER BY p.created_at DESC LIMIT 12`);
   }
   // Exact IMEI scan -> return that product with the unit pre-selected.
@@ -38,7 +39,7 @@ export async function searchProducts(term: string): Promise<ProductHit[]> {
     return `(p.name ILIKE $${i} OR p.brand ILIKE $${i} OR p.sku ILIKE $${i} OR p.category ILIKE $${i})`;
   });
   const rows = await q<ProductHit>(
-    `SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, ${STOCK_SQL} AS stock
+    `SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, p.track_batch, ${STOCK_SQL} AS stock
      FROM products p
      WHERE p.active AND p.status = 'active' AND (p.barcode = $1 OR p.sku = $1 OR (${conds.join(" AND ") || "false"}) ${unit[0] ? `OR p.id = ${Number(unit[0].product_id)}` : ""})
      ORDER BY (p.barcode = $1 OR p.sku = $1) DESC, p.name LIMIT 20`,
@@ -68,4 +69,10 @@ export async function searchCustomers(term: string) {
     "SELECT id, name, phone, trn, address FROM customers WHERE name ILIKE $1 OR phone ILIKE $1 ORDER BY name LIMIT 8",
     [`%${t}%`],
   );
+}
+
+export async function customerTermsFor(id: number) {
+  await requireUser();
+  const { customerTerms } = await import("@/lib/customer-pricing");
+  return customerTerms(q, id);
 }

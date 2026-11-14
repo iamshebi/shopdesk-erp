@@ -106,7 +106,7 @@ export default async function RepairPage({ params, searchParams }: { params: Pro
               <Field label="Charge (incl. VAT)"><input name="charge" defaultValue={charge} className="input" inputMode="decimal" required /></Field>
               {r.advance > 0 && <p className="text-xs text-slate-500">Advance of {num(r.advance)} will be deducted.</p>}
               <Field label="Balance paid by">
-                <select name="method" className="input">{PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
+                <select name="method" className="input">{PAYMENT_METHODS.filter((m) => m.id !== "store_credit").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
               </Field>
               <Submit confirm="Mark as delivered and create the invoice?">Deliver & create invoice</Submit>
             </form>

@@ -198,6 +198,7 @@ export async function invoiceOrder(fd: FormData) {
         lines, payments, notes: `Order ${o.number}${o.notes ? ` · ${o.notes}` : ""}`, userId: user.id,
       });
       await t("UPDATE orders SET sale_id=$2, status='delivered', updated_at=now() WHERE id=$1", [id, sid]);
+      if (o.sales_rep_id) await t("UPDATE sales SET sales_rep_id=$2 WHERE id=$1", [sid, o.sales_rep_id]);
       const [inv] = await t<{ number: string }>("SELECT number FROM sales WHERE id=$1", [sid]);
       await addEvent(t, id, "delivered", `Invoice ${inv.number}`, user.id);
       return sid;

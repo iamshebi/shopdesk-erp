@@ -28,7 +28,7 @@ export default async function NewRepair() {
           <Field label="Promised date"><input name="promised_at" type="date" min={todayDubai()} className="input" /></Field>
           <Field label="Advance paid"><input name="advance" className="input" inputMode="decimal" defaultValue="0" /></Field>
           <Field label="Advance paid by">
-            <select name="advance_method" className="input">{PAYMENT_METHODS.filter((m) => m.id !== "credit").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
+            <select name="advance_method" className="input">{PAYMENT_METHODS.filter((m) => m.id !== "credit" && m.id !== "store_credit").map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
           </Field>
         </div>
         <Submit>Create job card</Submit>

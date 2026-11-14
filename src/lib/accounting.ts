@@ -22,6 +22,7 @@ const DEFAULT_ACCOUNTS: [string, string, string, string, boolean?][] = [
   ["1300", "VAT recoverable (input)", "asset", "vat_in"],
   ["2000", "Accounts payable (suppliers)", "liability", "ap"],
   ["2100", "VAT payable (output)", "liability", "vat_out"],
+  ["2200", "Customer store credit", "liability", "store_credit"],
   ["3000", "Owner's capital", "equity", "capital"],
   ["3100", "Retained earnings", "equity", "retained"],
   ["4000", "Sales", "income", "sales"],
@@ -33,8 +34,8 @@ const DEFAULT_ACCOUNTS: [string, string, string, string, boolean?][] = [
 ];
 
 export async function ensureAccounts(t: Exec) {
-  const [n] = await t<{ n: number }>("SELECT count(*)::int n FROM accounts");
-  if (n.n) return;
+  const [n] = await t<{ n: number }>("SELECT count(*)::int n FROM accounts WHERE system_key <> ''");
+  if (n.n >= DEFAULT_ACCOUNTS.filter((a) => a[3]).length) return;
   for (const [code, name, type, key, bank] of DEFAULT_ACCOUNTS) {
     await t("INSERT INTO accounts (code, name, type, system_key, is_bank) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (code) DO NOTHING", [code, name, type, key, !!bank]);
   }
@@ -45,7 +46,7 @@ async function accountMap(t: Exec) {
   return Object.fromEntries(rows.map((r) => [r.system_key, r.id])) as Record<string, number>;
 }
 
-const METHOD_KEY: Record<string, string> = { cash: "cash", card: "card", bank: "bank", tabby: "tabby", tamara: "tamara" };
+const METHOD_KEY: Record<string, string> = { cash: "cash", card: "card", bank: "bank", tabby: "tabby", tamara: "tamara", store_credit: "store_credit" };
 
 async function expenseAccount(t: Exec, category: string) {
   const name = (category || "General").trim();
@@ -114,12 +115,16 @@ async function sync(): Promise<number> {
       await post(t, p.d, p.number, `purchase:${p.id}`, `Purchase ${p.number}${p.sup ? " · " + p.sup : ""}`, [[A.inventory, Number(p.subtotal), 0], [A.vat_in, Number(p.vat), 0], [A.ap, 0, Number(p.total)]]);
       n++;
     }
+    for (const r of await t<any>(`SELECT r.*, to_char(r.date,'YYYY-MM-DD') d FROM purchase_returns r WHERE r.total > 0 AND ${missing("pret", "r")} ORDER BY r.id`)) {
+      await post(t, r.d, r.number, `pret:${r.id}`, `Debit note ${r.number}`, [[A.ap, Number(r.total), 0], [A.inventory, 0, Number(r.subtotal)], [A.vat_in, 0, Number(r.vat)]]);
+      n++;
+    }
     for (const p of await t<any>(`SELECT sp.*, pu.number, ${DUBAI("sp.created_at")} d FROM supplier_payments sp JOIN purchases pu ON pu.id=sp.purchase_id WHERE ${missing("sp", "sp")} ORDER BY sp.id`)) {
       await post(t, p.d, p.number, `sp:${p.id}`, `Supplier payment ${p.number} (${p.method})`, [[A.ap, Number(p.amount), 0], [A[METHOD_KEY[p.method] ?? "bank"], 0, Number(p.amount)]]);
       n++;
     }
     // Expenses
-    for (const e of await t<any>(`SELECT e.*, to_char(e.date,'YYYY-MM-DD') d FROM expenses e WHERE ${missing("expense", "e")} ORDER BY e.id`)) {
+    for (const e of await t<any>(`SELECT e.*, to_char(e.date,'YYYY-MM-DD') d FROM expenses e WHERE e.status='approved' AND ${missing("expense", "e")} ORDER BY e.id`)) {
       const acc = await expenseAccount(t, e.category);
       await post(t, e.d, `EXP-${e.id}`, `expense:${e.id}`, `${e.category}: ${e.description}`, [[acc, Number(e.amount), 0], [A.vat_in, Number(e.vat), 0], [A[METHOD_KEY[e.method] ?? "cash"], 0, Number(e.total)]]);
       n++;

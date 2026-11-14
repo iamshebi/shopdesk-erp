@@ -8,7 +8,7 @@ import { defaultWarehouseId } from "./inventory";
 export async function makeBackup() {
   const tables: Record<string, unknown[]> = {};
   for (const t of BACKUP_TABLES) {
-    tables[t] = await q(t === "settings" ? "SELECT * FROM settings WHERE key <> 'session_secret'" : `SELECT * FROM ${t} ORDER BY 1`);
+    tables[t] = await q(t === "settings" ? "SELECT * FROM settings WHERE key <> 'session_secret'" : t === "files" ? "SELECT id, kind, owner_id, name, mime, size, encode(data,'base64') AS data_b64, sort, uploaded_by, created_at FROM files ORDER BY 1" : `SELECT * FROM ${t} ORDER BY 1`);
   }
   return { app: "shopdesk", version: 1, created_at: new Date().toISOString(), tables };
 }
@@ -20,7 +20,10 @@ export async function restoreBackup(data: any) {
     await t(`TRUNCATE ${BACKUP_TABLES.join(", ")} RESTART IDENTITY CASCADE`);
     for (const table of BACKUP_TABLES) {
       const rows: Record<string, unknown>[] = data.tables[table] ?? [];
-      for (const r of rows) {
+      for (const raw of rows) {
+        const r: Record<string, unknown> = { ...raw };
+        if (table === "files" && typeof r.data_b64 === "string") { r.data = Buffer.from(r.data_b64, "base64"); delete r.data_b64; }
+        if (table === "files" && !r.data) continue;
         const cols = Object.keys(r);
         if (!cols.length) continue;
         await t(`INSERT INTO ${table} (${cols.map((c) => `"${c.replace(/"/g, "")}"`).join(", ")}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})`, cols.map((c) => r[c]));

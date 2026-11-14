@@ -57,7 +57,7 @@ function addInterval(d: string, every: string) {
 /** Creates the invoices of every recurring template that is due. */
 export async function runRecurring(base: string, userId: number | null, onlyId?: number) {
   const s = await getSettings();
-  const owner = userId ?? (await one<{ id: number }>("SELECT id FROM users WHERE role='owner' ORDER BY id LIMIT 1"))?.id ?? 1;
+  const owner = userId ?? (await one<{ id: number }>("SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id WHERE r.permissions LIKE '%\"*\"%' ORDER BY u.id LIMIT 1"))?.id ?? 1;
   const due = await q<any>(
     `SELECT r.*, to_char(r.next_date,'YYYY-MM-DD') nd, c.name, c.phone, c.trn, c.address, c.email FROM recurring_invoices r JOIN customers c ON c.id=r.customer_id
      WHERE r.active AND ${onlyId ? "r.id=$1" : "r.next_date <= (now() AT TIME ZONE 'Asia/Dubai')::date"}`,

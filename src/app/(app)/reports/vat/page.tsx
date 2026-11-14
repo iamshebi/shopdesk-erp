@@ -34,7 +34,7 @@ export default async function VatReport({ searchParams }: { searchParams: Promis
             COALESCE(sum(si.vat) FILTER (WHERE s.type='credit_note'),0) cn_vat
      FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE ${D}`, P);
   const pur = await one<any>("SELECT COALESCE(sum(subtotal) FILTER (WHERE vat > 0),0) net, COALESCE(sum(vat),0) vat, COALESCE(sum(subtotal) FILTER (WHERE vat = 0),0) zero FROM purchases WHERE date BETWEEN $1 AND $2", P);
-  const exp = await one<any>("SELECT COALESCE(sum(amount) FILTER (WHERE vat > 0),0) net, COALESCE(sum(vat),0) vat FROM expenses WHERE date BETWEEN $1 AND $2", P);
+  const exp = await one<any>("SELECT COALESCE(sum(amount) FILTER (WHERE vat > 0),0) net, COALESCE(sum(vat),0) vat FROM expenses WHERE status='approved' AND date BETWEEN $1 AND $2", P);
   const marginNet = out.m_total - out.m_vat - out.m_cost;
   const outputVat = out.std_vat + out.m_vat;
   const inputVat = pur.vat + exp.vat;

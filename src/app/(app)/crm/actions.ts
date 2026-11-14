@@ -87,3 +87,18 @@ export async function saveCustomerCrm(fd: FormData) {
   revalidatePath(`/customers/${id}`);
   go(`/customers/${id}`, "Saved");
 }
+
+export async function saveCustomerPricing(fd: FormData) {
+  const user = await requireUser("customers");
+  const id = Number(str(fd, "id"));
+  const prices: Record<string, number> = {};
+  const missing: string[] = [];
+  for (const line of str(fd, "prices").split("\n").map((l) => l.trim()).filter(Boolean)) {
+    const [code, price] = line.split("|").map((x) => x.trim());
+    const p = await one<{ id: number }>("SELECT id FROM products WHERE (sku<>'' AND lower(sku)=lower($1)) OR (barcode<>'' AND barcode=$1) OR lower(name)=lower($1) LIMIT 1", [code]);
+    if (p && Number(price) > 0) prices[String(p.id)] = Number(price); else missing.push(code);
+  }
+  await q("UPDATE customers SET price_list=$2, discount_pct=$3 WHERE id=$1", [id, JSON.stringify(prices), Math.min(100, Math.max(0, numf(fd, "discount_pct")))]);
+  await log(user.id, "Customer pricing changed", `#${id}`, `/customers/${id}`);
+  go(`/customers/${id}`, missing.length ? `Saved. Not found: ${missing.join(", ")}` : "Pricing saved", missing.length ? "err" : "ok");
+}

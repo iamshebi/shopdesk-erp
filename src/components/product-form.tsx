@@ -9,6 +9,7 @@ export default function ProductForm(props: {
   brands: string[];
   isNew?: boolean;
   showCost?: boolean;
+  extra?: React.ReactNode;
 }) {
   const p = props.product ?? {};
   const [serial, setSerial] = useState<boolean>(p.track_serial ?? false);
@@ -31,6 +32,7 @@ export default function ProductForm(props: {
             <option value="active">Active (can be sold)</option>
             <option value="draft">Draft (not ready yet)</option>
             <option value="inactive">Inactive (hidden from sale)</option>
+            {p.status === "pending" && <option value="pending">Awaiting approval</option>}
           </select>
         </div>
         <div>
@@ -103,7 +105,12 @@ export default function ProductForm(props: {
           <input type="checkbox" name="is_service" checked={service} onChange={(e) => { setService(e.target.checked); if (e.target.checked) setSerial(false); }} />
           Service (no stock — e.g. software install)
         </label>
+        {!serial && !service && <label className="flex items-center gap-2">
+          <input type="checkbox" name="track_batch" defaultChecked={p.track_batch ?? false} />
+          Track batch numbers &amp; expiry dates
+        </label>}
       </div>
+      {props.extra}
       {props.isNew && !service && (
         serial ? (
           <div>

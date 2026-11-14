@@ -7,7 +7,7 @@ import type { Exec } from "./db";
 export const MOVE_TYPES: Record<string, string> = {
   opening: "Opening stock", purchase: "Purchase", sale: "Sale", return: "Customer return", buyback: "Bought used",
   adjust: "Adjustment", damaged: "Damaged", lost: "Lost / stolen", found: "Found", writeoff: "Written off",
-  transfer_out: "Transfer out", transfer_in: "Transfer in", count: "Stock count", supplier_return: "Returned to supplier", import: "Import",
+  transfer_out: "Transfer out", transfer_in: "Transfer in", count: "Stock count", supplier_return: "Returned to supplier", purchase_return: "Purchase return (debit note)", import: "Import",
 };
 
 export async function defaultWarehouseId(t: Exec): Promise<number> {
@@ -64,3 +64,20 @@ export async function moveUnit(t: Exec, m: Move & { unitId: number }) {
 export const WH_STOCK_SQL = (p: string, w: string) => `CASE WHEN ${p}.is_service THEN NULL WHEN ${p}.track_serial
   THEN (SELECT count(*)::int FROM units u WHERE u.product_id = ${p}.id AND u.status = 'in_stock' AND u.warehouse_id = ${w})
   ELSE COALESCE((SELECT ps.qty FROM product_stock ps WHERE ps.product_id = ${p}.id AND ps.warehouse_id = ${w}), 0) END`;
+
+/** Batch-tracked products: take stock out of the batch that expires first (FEFO), or put it back. */
+export async function moveBatches(t: Exec, productId: number, qty: number) {
+  const [p] = await t<{ track_batch: boolean }>("SELECT track_batch FROM products WHERE id=$1", [productId]);
+  if (!p?.track_batch || !qty) return;
+  if (qty > 0) {
+    await t("UPDATE batches SET qty = qty + $2 WHERE id = (SELECT id FROM batches WHERE product_id=$1 ORDER BY expiry_date DESC NULLS FIRST, id DESC LIMIT 1)", [productId, qty]);
+    return;
+  }
+  let need = -qty;
+  for (const b of await t<{ id: number; qty: number }>("SELECT id, qty FROM batches WHERE product_id=$1 AND qty > 0 ORDER BY expiry_date NULLS LAST, id", [productId])) {
+    if (need <= 0) break;
+    const take = Math.min(need, b.qty);
+    await t("UPDATE batches SET qty = qty - $2 WHERE id=$1", [b.id, take]);
+    need -= take;
+  }
+}

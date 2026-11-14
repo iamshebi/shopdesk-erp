@@ -43,7 +43,7 @@ export async function testConnection() {
 
 async function erpProducts(): Promise<ErpProduct[]> {
   return q<ErpProduct>(
-    `SELECT p.id, p.web_id, p.name, p.brand, p.category, p.description, p.specs, p.price, p.discount_price, p.status, p.active, p.website_visible, p.is_service, ${STOCK_SQL} AS stock
+    `SELECT p.id, p.web_id, p.name, p.brand, p.category, p.description, p.specs, p.price, p.discount_price, p.status, p.active, p.website_visible, p.is_service, p.image_url, ${STOCK_SQL} AS stock
      FROM products p ORDER BY p.id`,
   );
 }
@@ -92,7 +92,7 @@ export async function publishToWebsite(fd: FormData) {
     const { catalog, sha } = await fetchCatalog();
     if (expected && sha !== expected) back("The website changed since you opened the preview. Check the new preview and publish again.", "err", "&preview=1");
     const c = await websiteConfig();
-    const built = buildCatalog(catalog, await erpProducts(), c.showPrices);
+    const built = buildCatalog(catalog, await erpProducts(), c.showPrices, process.env.APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : ""));
     if (!built.changes.length) back("Nothing to publish. The website already matches the ERP.");
     added = built.added; updated = built.updated;
     summary = `${added} added, ${updated} updated`;

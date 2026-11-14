@@ -18,6 +18,8 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader title="Purchases" subtitle="Stock bought from suppliers">
+        <Link href="/purchases/orders" className="btn-ghost">Purchase orders &amp; requests</Link>
+        <Link href="/purchases/reorder" className="btn-ghost">Reorder suggestions</Link>
         <Link href="/purchases/new" className="btn-primary"><Plus size={16} /> New purchase</Link>
       </PageHeader>
       <div className="card overflow-x-auto">
@@ -33,7 +35,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
                   <td className="text-slate-500">{p.bill_ref}</td>
                   <td className="text-right tabular-nums">{num(p.vat)}</td>
                   <td className="text-right tabular-nums font-medium">{num(p.total)}</td>
-                  <td className="text-right">{p.paid >= p.total ? <Badge tone="green">Paid</Badge> : <Badge tone="amber">Owe {num(p.total - p.paid)}</Badge>}</td>
+                  <td className="text-right">{Number(p.returned) > 0 && <Badge tone="violet">Returned {num(p.returned)}</Badge>} {p.total - p.paid - p.returned <= 0.004 ? <Badge tone="green">Paid</Badge> : <Badge tone="amber">Owe {num(p.total - p.paid - p.returned)}</Badge>}</td>
                 </tr>
               ))}
             </tbody>

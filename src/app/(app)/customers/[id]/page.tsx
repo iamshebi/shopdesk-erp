@@ -8,7 +8,8 @@ import { PageHeader, Badge, Field, repairTone } from "@/components/ui";
 import Submit from "@/components/submit";
 import { MessageCircle } from "lucide-react";
 import { updateCustomer } from "../actions";
-import { addActivity, completeActivity, saveCustomerCrm } from "../../crm/actions";
+import { addActivity, completeActivity, saveCustomerCrm, saveCustomerPricing } from "../../crm/actions";
+import { storeCreditBalance } from "@/lib/store-credit";
 import { ACTIVITY_TYPES } from "@/lib/crm";
 import { redeemPoints } from "../../marketing/actions";
 import { getSettings } from "@/lib/settings";
@@ -27,6 +28,11 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const back = `/customers/${c.id}`;
   const st = await getSettings();
   const pts = (await one<{ p: number }>("SELECT COALESCE(sum(points),0)::int p FROM loyalty_ledger WHERE customer_id=$1", [c.id]))!.p;
+  const credit = await storeCreditBalance(q, c.id);
+  const clv = await one<any>(`SELECT COALESCE(sum(CASE WHEN type='invoice' THEN total ELSE -total END),0) spent, COALESCE(sum(CASE WHEN type='invoice' THEN total-vat-cost ELSE -(total-vat-cost) END),0) profit,
+    count(*) FILTER (WHERE type='invoice')::int n, min(date) first, max(date) last FROM sales WHERE customer_id=$1`, [c.id]);
+  const priceRows = Object.keys(c.price_list ?? {}).length ? await q<any>("SELECT id, sku, name FROM products WHERE id = ANY($1)", [Object.keys(c.price_list).map(Number)]) : [];
+  const priceText = priceRows.map((p) => `${p.sku || p.name} | ${c.price_list[String(p.id)]}`).join("\n");
   const vouchers = await q<any>("SELECT code, value, uses FROM coupons WHERE customer_id=$1 ORDER BY id DESC LIMIT 5", [c.id]);
   const orders = await q<any>("SELECT id, number, kind, status, total, created_at FROM orders WHERE customer_id=$1 ORDER BY id DESC LIMIT 20", [c.id]);
   return (
@@ -40,6 +46,12 @@ export default async function CustomerPage({ params, searchParams }: { params: P
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="card p-4"><div className="text-xs text-slate-500">Lifetime value</div><div className="text-lg font-semibold tabular-nums">{num(clv.spent)}</div><div className="text-xs text-slate-400">profit {num(clv.profit)}</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-500">Invoices</div><div className="text-lg font-semibold">{clv.n}</div><div className="text-xs text-slate-400">avg {num(clv.n ? clv.spent / clv.n : 0)}</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-500">Customer since / last buy</div><div className="text-sm font-medium">{clv.first ? fmtDate(clv.first) : "—"}</div><div className="text-xs text-slate-400">{clv.last ? fmtDate(clv.last) : "never"}</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-500">Store credit</div><div className="text-lg font-semibold tabular-nums">{num(credit)}</div>{credit > 0 && <Link href={`/pos?customer=${c.id}`} className="text-xs text-accent">Use at the till</Link>}</div>
+          </div>
           <div className="card p-5">
             <div className="mb-3 font-semibold">Timeline &amp; follow-ups</div>
             <form action={addActivity} className="mb-4 flex flex-wrap gap-2">
@@ -113,6 +125,13 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             {vouchers.map((v) => <div key={v.code} className="flex justify-between text-xs"><span className="font-mono">{v.code}</span><span>{Number(v.value).toFixed(2)} {v.uses ? "· used" : "· unused"}</span></div>)}
           </form>
         )}
+        <form action={saveCustomerPricing} className="card h-fit space-y-3 p-5">
+          <h3 className="font-semibold">Customer pricing</h3>
+          <input type="hidden" name="id" value={c.id} />
+          <Field label="Discount on all items (%)"><input name="discount_pct" defaultValue={Number(c.discount_pct) || ""} className="input" inputMode="decimal" /></Field>
+          <Field label="Special prices: SKU or name | price, one per line"><textarea name="prices" defaultValue={priceText} rows={3} className="input font-mono text-xs" /></Field>
+          <Submit className="btn-dark">Save pricing</Submit>
+        </form>
         <form action={saveCustomerCrm} className="card h-fit space-y-3 p-5">
           <h3 className="font-semibold">Group, tags &amp; credit</h3>
           <input type="hidden" name="id" value={c.id} />

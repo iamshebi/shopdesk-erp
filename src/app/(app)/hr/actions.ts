@@ -140,3 +140,12 @@ export async function setPayrollStatus(fd: FormData) {
   await log(user.id, `Payroll ${status}`, `#${runId}`, `/hr/payroll/${runId}`);
   go(`/hr/payroll/${runId}`, status === "paid" ? "Marked paid. Salaries are posted to the accounts." : `Payroll ${status}`);
 }
+
+export async function saveCommissionRates(fd: FormData) {
+  const user = await requireUser("payroll");
+  for (const id of fd.getAll("uid").map(Number)) {
+    await q("UPDATE users SET commission_rate=$2, commission_base=$3 WHERE id=$1", [id, Math.min(100, Math.max(0, numf(fd, `rate_${id}`))), str(fd, `base_${id}`) === "sales" ? "sales" : "profit"]);
+  }
+  await log(user.id, "Commission rates changed", "", "/hr/commissions");
+  go(`/hr/commissions?month=${str(fd, "month")}`, "Rates saved");
+}

@@ -7,6 +7,7 @@ import { PageHeader, Badge, Stat } from "@/components/ui";
 import EmployeeForm from "@/components/employee-form";
 import HrTabs from "../tabs";
 import { saveEmployee } from "../actions";
+import Attachments from "@/components/attachments";
 
 export default async function EmployeePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   await requireUser("hr");
@@ -36,6 +37,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
         <Stat label="Monthly gross" value={`${s.currency} ${num(Number(e.basic_salary) + Number(e.allowances))}`} />
       </div>
       <div className="card mb-6 p-6"><EmployeeForm action={saveEmployee} e={e} departments={departments} users={users} /></div>
+      <div className="mb-6"><Attachments kind="employee" ownerId={e.id} back={`/hr/${e.id}`} title="Documents (passport, visa, Emirates ID, contract)" /></div>
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card overflow-x-auto"><div className="p-5 pb-2 font-semibold">Payslips</div>
           <table className="tbl"><tbody>{slips.map((p) => <tr key={p.id}><td>{p.month}</td><td className="capitalize text-slate-500">{p.status}</td><td className="text-right tabular-nums">{num(p.net)}</td><td className="text-right"><a href={`/print/payslip/${p.id}`} target="_blank" className="text-accent">Print</a></td></tr>)}

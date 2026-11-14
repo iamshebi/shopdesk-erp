@@ -9,7 +9,10 @@ import { addSupplier } from "./actions";
 export default async function SuppliersPage() {
   await requireUser("suppliers");
   const rows = await q<any>(
-    `SELECT s.*, COALESCE(sum(p.total),0) bought, COALESCE(sum(p.total - p.paid),0) balance, count(p.id)::int bills
+    `SELECT s.*, COALESCE(sum(p.total),0) bought, COALESCE(sum(p.total - p.paid - p.returned),0) balance, count(p.id)::int bills,
+       (SELECT COALESCE(sum(r.total),0) FROM purchase_returns r WHERE r.supplier_id=s.id) returned,
+       (SELECT count(*)::int FROM purchase_orders o WHERE o.supplier_id=s.id AND o.status IN ('approved','ordered','partial')) open_pos,
+       (SELECT round(100.0 * count(*) FILTER (WHERE pu.date <= o.expected_date) / NULLIF(count(*),0)) FROM purchases pu JOIN purchase_orders o ON o.id=pu.po_id WHERE o.supplier_id=s.id AND o.expected_date IS NOT NULL) on_time
      FROM suppliers s LEFT JOIN purchases p ON p.supplier_id = s.id GROUP BY s.id ORDER BY s.name`,
   );
   return (
@@ -25,14 +28,14 @@ export default async function SuppliersPage() {
       <div className="card overflow-x-auto">
         {rows.length === 0 ? <Empty>No suppliers yet.</Empty> : (
           <table className="tbl">
-            <thead><tr><th>Supplier</th><th>Phone</th><th>TRN</th><th className="text-right">Bills</th><th className="text-right">Total bought</th><th className="text-right">We owe</th></tr></thead>
+            <thead><tr><th>Supplier</th><th>Phone</th><th>TRN</th><th className="text-right">Bills</th><th className="text-right">Open orders</th><th className="text-right">On time</th><th className="text-right">Returned</th><th className="text-right">Total bought</th><th className="text-right">We owe</th></tr></thead>
             <tbody>
               {rows.map((s) => (
                 <tr key={s.id}>
                   <td className="font-medium"><Link href={`/purchases?supplier=${s.id}`} className="hover:text-accent">{s.name}</Link></td>
                   <td>{s.phone}</td>
                   <td className="font-mono text-xs">{s.trn}</td>
-                  <td className="text-right">{s.bills}</td>
+                  <td className="text-right">{s.bills}</td><td className="text-right">{s.open_pos || "—"}</td><td className="text-right">{s.on_time != null ? `${s.on_time}%` : "—"}</td><td className="text-right tabular-nums">{Number(s.returned) > 0 ? num(s.returned) : "—"}</td>
                   <td className="text-right tabular-nums">{num(s.bought)}</td>
                   <td className={`text-right tabular-nums font-medium ${s.balance > 0 ? "text-red-600" : ""}`}>{num(s.balance)}</td>
                 </tr>
