@@ -13,6 +13,16 @@ export async function readSaleToken(token: string) {
   const good = await saleToken(n);
   return good.length === token.length && crypto.timingSafeEqual(Buffer.from(good), Buffer.from(token)) ? n : null;
 }
+export async function customerToken(id: number) {
+  const sig = crypto.createHmac("sha256", await getSecret()).update(`customer:${id}`).digest("base64url").slice(0, 22);
+  return `${id}.${sig}`;
+}
+export async function readCustomerToken(token: string) {
+  const n = Number(token.split(".")[0]);
+  if (!n) return null;
+  const good = await customerToken(n);
+  return good.length === token.length && crypto.timingSafeEqual(Buffer.from(good), Buffer.from(token)) ? n : null;
+}
 export async function baseUrl() {
   const { headers } = await import("next/headers");
   const h = await headers();

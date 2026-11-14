@@ -129,6 +129,7 @@ export async function savePO(fd: FormData) {
     await log(user.id, auto ? "Purchase order created" : "Purchase request raised", `${number} · ${subtotal.toFixed(2)}`, `/purchases/orders/${po.id}`, t);
     return po.id;
   });
+  if (!auto) await (await import("@/lib/notify")).notifyPerm(["purchases.approve"], `Purchase request from ${user.name} needs approval (${subtotal.toFixed(2)})`, `/purchases/orders/${id}`, "approval", user.id);
   revalidatePath("/purchases/orders");
   go(`/purchases/orders/${id}`, auto ? "Purchase order created" : "Request sent for approval");
 }

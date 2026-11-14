@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare, Gift, PackageCheck, Zap } from "lucide-react";
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare, Gift, PackageCheck, Zap, Bell, CalendarDays } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
 type Item = { area: string; href: string; label: string; icon: typeof LayoutDashboard; key?: string };
@@ -49,7 +49,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
       { area: "reports", href: "/reports", label: "Reports", icon: BarChart3 },
     ],
   },
-  { id: "team", label: "Team", items: [{ area: "hr", href: "/hr", label: "HR & payroll", icon: IdCard }, { area: "tasks", href: "/tasks", label: "Tasks & projects", icon: KanbanSquare, key: "T" }] },
+  { id: "team", label: "Team", items: [{ area: "hr", href: "/hr", label: "HR & payroll", icon: IdCard }, { area: "tasks", href: "/tasks", label: "Tasks & projects", icon: KanbanSquare, key: "T" }, { area: "dashboard", href: "/calendar", label: "Calendar", icon: CalendarDays }] },
   { id: "admin", label: "Administration", items: [{ area: "website", href: "/website", label: "Website", icon: Globe }, { area: "automation", href: "/automation", label: "Automation", icon: Zap }, { area: "settings", href: "/settings", label: "Settings", icon: Settings }] },
 ];
 
@@ -58,13 +58,19 @@ function setTheme(dark: boolean) {
   try { localStorage.setItem("sd-theme", dark ? "dark" : "light"); } catch {}
 }
 
-export default function Sidebar(props: { shopName: string; logo: string; userName: string; role: string; areas: string[]; reportsHref?: string; settingsHref?: string }) {
+export default function Sidebar(props: { shopName: string; logo: string; userName: string; role: string; areas: string[]; reportsHref?: string; settingsHref?: string; unread?: number }) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(false);
   const [closed, setClosed] = useState<string[]>([]);
   const [help, setHelp] = useState(false);
+  const [unread, setUnread] = useState(props.unread ?? 0);
+  useEffect(() => {
+    setUnread(props.unread ?? 0);
+    const t = setInterval(() => { fetch("/api/notifications").then((r) => (r.ok ? r.json() : null)).then((j) => j && setUnread(j.unread)).catch(() => {}); }, 60000);
+    return () => clearInterval(t);
+  }, [props.unread]);
 
   const groups = GROUPS.map((g) => ({
     ...g,
@@ -117,6 +123,10 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
           <div className="truncate text-sm font-semibold">{props.shopName}</div>
           <div className="text-[11px] text-slate-400">ShopDesk ERP</div>
         </div>
+        <Link href="/notifications" onClick={() => setOpen(false)} className="relative ml-auto rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`} title="Notifications">
+          <Bell size={18} />
+          {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}
+        </Link>
       </div>
       <div className="px-3 pb-2">
         <button

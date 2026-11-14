@@ -25,6 +25,8 @@ export async function saveTask(fd: FormData) {
   if (id) await q("UPDATE tasks SET title=$2, description=$3, project_id=$4, assignee_id=$5, priority=$6, due_date=$7, link=$8, updated_at=now() WHERE id=$1", [id, ...f]);
   else tid = (await one<{ id: number }>("INSERT INTO tasks (title, description, project_id, assignee_id, priority, due_date, link, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", [...f, user.id]))!.id;
   await log(user.id, id ? "Task edited" : "Task added", title, `/tasks/${tid}`);
+  const assignee = Number(str(fd, "assignee_id")) || null;
+  if (assignee && assignee !== user.id) await (await import("@/lib/notify")).notify(assignee, `${user.name} gave you a task: ${title}`, `/tasks/${tid}`, "task");
   revalidatePath("/tasks");
   go(id ? `/tasks/${tid}` : back, "Saved");
 }
@@ -40,7 +42,12 @@ export async function moveTask(fd: FormData) {
 export async function commentTask(fd: FormData) {
   const user = await requireUser("tasks");
   const id = Number(str(fd, "id")), body = str(fd, "body");
-  if (body) await q("INSERT INTO task_comments (task_id, body, user_id) VALUES ($1,$2,$3)", [id, body, user.id]);
+  if (body) {
+    await q("INSERT INTO task_comments (task_id, body, user_id) VALUES ($1,$2,$3)", [id, body, user.id]);
+    const t = await one<any>("SELECT title, assignee_id, created_by FROM tasks WHERE id=$1", [id]);
+    const { notify } = await import("@/lib/notify");
+    for (const uid of new Set([t?.assignee_id, t?.created_by])) if (uid && uid !== user.id) await notify(uid, `${user.name} commented on “${t.title}”`, `/tasks/${id}`, "task");
+  }
   go(`/tasks/${id}`);
 }
 

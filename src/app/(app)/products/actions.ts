@@ -82,6 +82,7 @@ export async function createProduct(fd: FormData) {
     return p.id;
   });
   await log(user.id, "Product added", d.name, `/products/${id}`);
+  if (d.status === "pending") await (await import("@/lib/notify")).notifyPerm(["products.approve"], `New product needs approval: ${d.name}`, `/products/${id}`, "approval", user.id);
   revalidatePath("/products");
   redirect(`/products/${id}`);
 }

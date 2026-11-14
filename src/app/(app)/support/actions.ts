@@ -31,6 +31,9 @@ export async function createTicket(fd: FormData) {
     return r.id;
   });
   await log(user.id, "Ticket opened", subject, `/support/${id}`);
+  const asg = Number(str(fd, "assignee_id")) || null;
+  if (asg && asg !== user.id) await (await import("@/lib/notify")).notify(asg, `Ticket assigned to you: ${subject}`, `/support/${id}`, "ticket");
+  await (await import("@/lib/webhooks")).fireWebhook("ticket.created", { id, subject });
   revalidatePath("/support");
   go(`/support/${id}`, "Ticket opened");
 }
@@ -54,6 +57,7 @@ export async function updateTicket(fd: FormData) {
   if ((assignee ?? null) !== (before.assignee_id ?? null)) {
     const u = assignee ? await one<{ name: string }>("SELECT name FROM users WHERE id=$1", [assignee]) : null;
     changes.push(`assigned to ${u?.name ?? "nobody"}`);
+    if (assignee && assignee !== user.id) await (await import("@/lib/notify")).notify(assignee, `Ticket ${before.number} assigned to you: ${before.subject}`, `/support/${id}`, "ticket");
   }
   if (changes.length) await q("INSERT INTO ticket_messages (ticket_id, body, internal, user_id) VALUES ($1,$2,TRUE,$3)", [id, changes.join(", "), user.id]);
   revalidatePath(`/support/${id}`);

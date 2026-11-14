@@ -45,6 +45,7 @@ export async function POST(req: Request) {
     await addEvent(t, o.id, "draft", `Received via API (${a.key.name})`, null);
     return { id: o.id, number, total: priced.total };
   });
+  await (await import("@/lib/notify")).notifyPerm(["orders"], `New order ${res.number} via ${a.key.name}`, `/orders/${res.id}`, "order");
   await fireWebhook("order.created", { ...res, source: "api" });
   return Response.json({ data: res }, { status: 201 });
 }

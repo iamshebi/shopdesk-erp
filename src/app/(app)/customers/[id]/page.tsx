@@ -10,6 +10,7 @@ import { MessageCircle } from "lucide-react";
 import { updateCustomer } from "../actions";
 import { addActivity, completeActivity, saveCustomerCrm, saveCustomerPricing } from "../../crm/actions";
 import { storeCreditBalance } from "@/lib/store-credit";
+import { customerToken, baseUrl } from "@/lib/public-link";
 import { ACTIVITY_TYPES } from "@/lib/crm";
 import { redeemPoints } from "../../marketing/actions";
 import { getSettings } from "@/lib/settings";
@@ -29,6 +30,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const st = await getSettings();
   const pts = (await one<{ p: number }>("SELECT COALESCE(sum(points),0)::int p FROM loyalty_ledger WHERE customer_id=$1", [c.id]))!.p;
   const credit = await storeCreditBalance(q, c.id);
+  const portal = `${await baseUrl()}/portal/${await customerToken(c.id)}`;
   const clv = await one<any>(`SELECT COALESCE(sum(CASE WHEN type='invoice' THEN total ELSE -total END),0) spent, COALESCE(sum(CASE WHEN type='invoice' THEN total-vat-cost ELSE -(total-vat-cost) END),0) profit,
     count(*) FILTER (WHERE type='invoice')::int n, min(date) first, max(date) last FROM sales WHERE customer_id=$1`, [c.id]);
   const priceRows = Object.keys(c.price_list ?? {}).length ? await q<any>("SELECT id, sku, name FROM products WHERE id = ANY($1)", [Object.keys(c.price_list).map(Number)]) : [];
@@ -41,6 +43,8 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         {c.group_name && <Badge tone="violet">{c.group_name}</Badge>}
         {owes > 0.004 && <Badge tone="red">Owes {num(owes)}{Number(c.credit_limit) > 0 ? ` / limit ${num(c.credit_limit)}` : ""}</Badge>}
         {c.phone && <a href={waLink(c.phone, `Hello ${c.name}, `)} target="_blank" className="btn-ghost"><MessageCircle size={16} /> WhatsApp</a>}
+        <a href={portal} target="_blank" className="btn-ghost">Customer portal</a>
+        {c.phone && <a href={waLink(c.phone, `Hello ${c.name}, here is your personal page with your orders, invoices and points: ${portal}`)} target="_blank" className="btn-ghost">Send portal link</a>}
       </PageHeader>
       {sp.ok && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}
       {sp.err && <div className="card mb-4 bg-red-50 p-3 text-sm text-red-700">{sp.err}</div>}

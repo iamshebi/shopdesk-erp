@@ -28,7 +28,8 @@ export async function restoreBackup(data: any) {
         if (!cols.length) continue;
         await t(`INSERT INTO ${table} (${cols.map((c) => `"${c.replace(/"/g, "")}"`).join(", ")}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})`, cols.map((c) => r[c]));
       }
-      if (!["settings", "counters"].includes(table)) {
+      const [hasId] = await t("SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name='id' AND column_default LIKE 'nextval%'", [table]);
+      if (hasId) {
         await t(`SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT max(id) FROM ${table}), 1), (SELECT max(id) FROM ${table}) IS NOT NULL)`);
       }
     }

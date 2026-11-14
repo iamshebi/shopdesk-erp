@@ -951,4 +951,91 @@ export const MIGRATIONS: string[] = [
    ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved';
    ALTER TABLE expenses ADD COLUMN IF NOT EXISTS approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
    ALTER TABLE expenses ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL;`,
+
+  // 13. Website carts (abandoned cart tracking), saved views, favourites, recently viewed, error log, holidays,
+  //     campaigns, referrals
+  `CREATE TABLE IF NOT EXISTS web_carts (
+     id SERIAL PRIMARY KEY,
+     token TEXT NOT NULL UNIQUE,
+     name TEXT NOT NULL DEFAULT '',
+     phone TEXT NOT NULL DEFAULT '',
+     email TEXT NOT NULL DEFAULT '',
+     items JSONB NOT NULL DEFAULT '[]',
+     total NUMERIC(12,2) NOT NULL DEFAULT 0,
+     status TEXT NOT NULL DEFAULT 'open',
+     order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+     reminded_at TIMESTAMPTZ,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS user_prefs (
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     key TEXT NOT NULL,
+     value JSONB NOT NULL DEFAULT '{}',
+     PRIMARY KEY (user_id, key)
+   );
+   CREATE TABLE IF NOT EXISTS error_log (
+     id SERIAL PRIMARY KEY,
+     source TEXT NOT NULL DEFAULT 'app',
+     message TEXT NOT NULL,
+     detail TEXT NOT NULL DEFAULT '',
+     path TEXT NOT NULL DEFAULT '',
+     user_id INTEGER,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS api_log (
+     id SERIAL PRIMARY KEY,
+     key_id INTEGER,
+     method TEXT NOT NULL,
+     path TEXT NOT NULL,
+     status INTEGER NOT NULL DEFAULT 200,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS holidays (
+     id SERIAL PRIMARY KEY,
+     date DATE NOT NULL UNIQUE,
+     name TEXT NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS campaigns (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     channel TEXT NOT NULL DEFAULT 'whatsapp',
+     segment TEXT NOT NULL DEFAULT 'all',
+     group_name TEXT NOT NULL DEFAULT '',
+     subject TEXT NOT NULL DEFAULT '',
+     message TEXT NOT NULL DEFAULT '',
+     coupon_code TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL DEFAULT 'draft',
+     recipients INTEGER NOT NULL DEFAULT 0,
+     sent INTEGER NOT NULL DEFAULT 0,
+     cost NUMERIC(12,2) NOT NULL DEFAULT 0,
+     sent_at TIMESTAMPTZ,
+     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS referred_by INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+   ALTER TABLE customers ADD COLUMN IF NOT EXISTS marketing_opt_out BOOLEAN NOT NULL DEFAULT FALSE;
+   ALTER TABLE coupons ADD COLUMN IF NOT EXISTS affiliate TEXT NOT NULL DEFAULT '';
+   ALTER TABLE coupons ADD COLUMN IF NOT EXISTS affiliate_rate NUMERIC(5,2) NOT NULL DEFAULT 0;
+   ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_start TEXT NOT NULL DEFAULT '';
+   ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_end TEXT NOT NULL DEFAULT '';
+   ALTER TABLE employees ADD COLUMN IF NOT EXISTS onboarding JSONB NOT NULL DEFAULT '{}';
+   CREATE TABLE IF NOT EXISTS employee_reviews (
+     id SERIAL PRIMARY KEY,
+     employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+     period TEXT NOT NULL DEFAULT '',
+     rating INTEGER NOT NULL DEFAULT 3,
+     strengths TEXT NOT NULL DEFAULT '',
+     improve TEXT NOT NULL DEFAULT '',
+     reviewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS shipping_zones (
+     id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+     areas TEXT NOT NULL DEFAULT '',
+     charge NUMERIC(12,2) NOT NULL DEFAULT 0,
+     free_over NUMERIC(12,2) NOT NULL DEFAULT 0,
+     days TEXT NOT NULL DEFAULT ''
+   );`,
 ];

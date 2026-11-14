@@ -6,6 +6,7 @@ export const FILE_KINDS: Record<string, { perm: string; public?: boolean; images
   employee: { perm: "hr", label: "Documents" },
   ticket: { perm: "support", label: "Attachments" },
   customer: { perm: "customers", label: "Documents" },
+  site: { perm: "website", public: true, images: true, label: "Website images" },
   company: { perm: "settings", label: "Company documents" },
 };
 export const MAX_FILE = 3 * 1024 * 1024;

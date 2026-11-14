@@ -24,6 +24,7 @@ export async function POST(req: Request) {
     await t("UPDATE sales SET paid = paid + $2 WHERE id=$1", [saleId, pay]);
     return true;
   });
+  if (done) await (await import("@/lib/notify")).notifyPerm(["sales.payments"], `Online payment received: ${amount.toFixed(2)}`, `/sales/${saleId}`, "payment");
   if (done) await fireWebhook("sale.paid", await one("SELECT id, number, total, paid FROM sales WHERE id=$1", [saleId]));
   return Response.json({ ok: true });
 }

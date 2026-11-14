@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { q, one } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -32,6 +33,7 @@ export default async function WebsitePage({ searchParams }: { searchParams: Prom
   return (
     <div className="max-w-5xl">
       <PageHeader title="Website" subtitle="Keep the shop website's products in step with the ERP">
+        <Link href="/website/content" className="btn-primary">Banners, pages, SEO &amp; orders</Link>
         {c.url && <a href={c.url} target="_blank" className="btn-ghost"><Globe size={16} /> Open website</a>}
       </PageHeader>
       {sp.ok && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">{sp.ok}</div>}

@@ -19,6 +19,7 @@ export const TRIGGERS = [
 export const ACTIONS = [
   { id: "task", label: "Create a task for…" },
   { id: "email", label: "Send an email to…" },
+  { id: "notify", label: "Show an in-app notification to…" },
   { id: "webhook", label: "Send a webhook event" },
 ] as const;
 
@@ -71,6 +72,9 @@ export async function runAutomations(base: string, onlyId?: number) {
         for (const h of fresh) await q("INSERT INTO tasks (title, assignee_id, link, priority, description) VALUES ($1,$2,$3,'normal',$4)", [h.title.slice(0, 200), r.assignee_id, h.link, `Created by automation “${r.name}”`]);
       } else if (r.action === "email" && r.email) {
         await sendEmail(r.email, `${s.shop_name}: ${r.name} (${fresh.length})`, `<h3>${esc(r.name)}</h3><ul>${fresh.map((h) => `<li><a href="${base}${h.link}">${esc(h.title)}</a></li>`).join("")}</ul>`);
+      } else if (r.action === "notify") {
+        const { notify, notifyPerm } = await import("./notify");
+        for (const h of fresh) { if (r.assignee_id) await notify(r.assignee_id, h.title, h.link, "alert"); else await notifyPerm(["settings"], h.title, h.link, "alert"); }
       } else if (r.action === "webhook") {
         await fireWebhook(r.trigger === "low_stock" ? "stock.low" : `automation.${r.trigger}`, { rule: r.name, items: fresh });
       }

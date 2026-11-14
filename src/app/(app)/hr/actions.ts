@@ -63,6 +63,7 @@ export async function requestLeave(fd: FormData) {
   const days = numf(fd, "days") || Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
   await q("INSERT INTO leave_requests (employee_id, type, from_date, to_date, days, reason) VALUES ($1,$2,$3,$4,$5,$6)", [emp, str(fd, "type") || "annual", from, to, days, str(fd, "reason")]);
   await log(user.id, "Leave requested", `${days} day(s)`, "/hr/leave");
+  await (await import("@/lib/notify")).notifyPerm(["hr"], `Leave request waiting: ${days} day(s) from ${from}`, "/hr/leave", "approval", user.id);
   go("/hr/leave", "Leave request added");
 }
 

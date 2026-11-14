@@ -24,7 +24,7 @@ export default async function AutomationPage({ searchParams }: { searchParams: P
         <div><label className="label">N (days / hours / qty)</label><input name="threshold" defaultValue="3" className="input" inputMode="decimal" /></div>
         <div className="sm:col-span-2"><label className="label">Rule name</label><input name="name" className="input" placeholder="optional" /></div>
         <div className="sm:col-span-2"><label className="label">Then</label><select name="action" className="input">{ACTIONS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}</select></div>
-        <div className="sm:col-span-2"><label className="label">Task for</label><select name="assignee_id" className="input"><option value="">— unassigned —</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+        <div className="sm:col-span-2"><label className="label">Task / notification for</label><select name="assignee_id" className="input"><option value="">— unassigned —</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
         <div className="sm:col-span-2"><label className="label">Email to</label><input name="email" className="input" placeholder="for email action" /></div>
         <div className="sm:col-span-6"><Submit>Add rule</Submit></div>
       </form>
@@ -35,7 +35,7 @@ export default async function AutomationPage({ searchParams }: { searchParams: P
             {rules.map((r) => (
               <tr key={r.id} className={r.active ? "" : "opacity-50"}>
                 <td className="font-medium">{r.name}<div className="text-xs font-normal text-slate-400">{TRIGGERS.find((t) => t.id === r.trigger)?.label} {Number(r.threshold) > 0 && `· N=${Number(r.threshold)}`}</div></td>
-                <td>{r.action === "task" ? `Task for ${r.who ?? "anyone"}` : r.action === "email" ? `Email ${r.email}` : "Webhook"}</td>
+                <td>{r.action === "task" ? `Task for ${r.who ?? "anyone"}` : r.action === "notify" ? `Notify ${r.who ?? "managers"}` : r.action === "email" ? `Email ${r.email}` : "Webhook"}</td>
                 <td>{r.fired}</td><td className="text-slate-500">{r.last_run_at ? fmtDate(r.last_run_at, true) : "—"}</td>
                 <td className="text-right"><div className="flex justify-end gap-1">
                   <form action={runNow}><input type="hidden" name="id" value={r.id} /><Submit className="btn-ghost btn-sm">Run now</Submit></form>

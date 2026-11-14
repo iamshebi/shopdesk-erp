@@ -46,6 +46,16 @@ export interface ShopSettings {
   books_locked_until: string;
   fiscal_year_start_month: number;
   require_product_approval: boolean;
+  site_content: string;
+  website_orders_enabled: boolean;
+  portal_enabled: boolean;
+  referral_points: number;
+  sms_provider_url: string;
+  sms_key_enc: string;
+  whatsapp_token_enc: string;
+  whatsapp_phone_id: string;
+  sheet_token: string;
+  default_language: string;
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -91,6 +101,16 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   books_locked_until: "",
   fiscal_year_start_month: 1,
   require_product_approval: false,
+  site_content: "{}",
+  website_orders_enabled: true,
+  portal_enabled: true,
+  referral_points: 0,
+  sms_provider_url: "",
+  sms_key_enc: "",
+  whatsapp_token_enc: "",
+  whatsapp_phone_id: "",
+  sheet_token: "",
+  default_language: "en",
   couriers: "Aramex|https://www.aramex.com/track/results?ShipmentNumber={n}\nDHL|https://www.dhl.com/ae-en/home/tracking.html?tracking-id={n}\nEmirates Post|https://www.emiratespost.ae/track?trackno={n}\nOwn driver|",
 };
 
