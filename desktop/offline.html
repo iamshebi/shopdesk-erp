@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" />
+<title>Offline till</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; background: #f6f7f9; color: #0f172a; height: 100vh; display: flex; flex-direction: column; }
+  .bar { padding: 10px 16px; display: flex; align-items: center; gap: 12px; color: #fff; background: #b91c1c; }
+  .bar.back { background: #047857; }
+  .bar b { font-size: 15px; }
+  .bar .grow { flex: 1; }
+  .bar button { background: rgba(255,255,255,.18); color: #fff; }
+  main { flex: 1; display: grid; grid-template-columns: 1fr 360px; gap: 14px; padding: 14px; min-height: 0; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  input, select { font: 14px "Segoe UI", system-ui, sans-serif; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; width: 100%; }
+  input:focus, select:focus { outline: 2px solid #0f766e33; border-color: #0f766e; }
+  button { font: 600 13px "Segoe UI", system-ui, sans-serif; border: 0; border-radius: 10px; padding: 8px 12px; cursor: pointer; background: #eef2f6; color: #0f172a; }
+  button.primary { background: #0f766e; color: #fff; width: 100%; height: 48px; font-size: 16px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .results { max-height: 220px; overflow: auto; margin-top: 6px; }
+  .res { display: flex; justify-content: space-between; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .res:hover, .res.sel { background: #f1f5f9; }
+  .muted { color: #64748b; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; padding: 6px; }
+  td { padding: 6px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
+  td input, td select { padding: 5px 7px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .total { font-size: 28px; font-weight: 700; }
+  .row { display: flex; justify-content: space-between; gap: 8px; }
+  .err { color: #b91c1c; font-size: 13px; min-height: 18px; }
+  .ok { color: #047857; }
+  .pend { overflow: auto; flex: 1; min-height: 80px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 99px; background: #fef3c7; color: #92400e; }
+  .tag.fail { background: #fee2e2; color: #b91c1c; }
+  .x { background: none; color: #94a3b8; padding: 2px 6px; }
+</style>
+</head>
+<body>
+<div class="bar" id="bar">
+  <div class="grow"><b id="barTitle">OFFLINE: no internet</b> · <span id="barText">Sales are saved on this PC and upload by themselves when the internet is back.</span></div>
+  <span id="pendingCount"></span>
+  <button id="retry">Try now</button>
+</div>
+<main>
+  <div class="col">
+    <div class="card">
+      <input id="search" placeholder="Scan barcode / IMEI or type a product name" autocomplete="off" autofocus />
+      <div class="results" id="results"></div>
+      <div class="muted" id="catInfo"></div>
+    </div>
+    <div class="card" style="flex:1; overflow:auto">
+      <table>
+        <thead><tr><th>Item</th><th style="width:70px">Qty</th><th style="width:110px" class="num">Price</th><th style="width:90px" class="num">Discount</th><th style="width:100px" class="num">Total</th><th style="width:30px"></th></tr></thead>
+        <tbody id="cart"></tbody>
+      </table>
+      <div class="muted" id="empty" style="padding:24px;text-align:center">Scan or search to add items</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <div class="row muted"><span>Items</span><span id="tItems">0</span></div>
+      <div class="row muted" id="vatRow"><span id="vatLabel">VAT</span><span id="tVat" class="num">0.00</span></div>
+      <div class="row" style="align-items:baseline;margin-top:6px"><span class="muted">Total</span><span class="total num" id="tTotal">0.00</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <select id="method"></select>
+        <input id="paid" placeholder="Received" inputmode="decimal" class="num" />
+      </div>
+      <div class="row" style="margin-top:6px"><span class="muted" id="changeLabel">Change</span><span class="num" id="change"></span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <input id="cname" placeholder="Customer name (optional)" />
+        <input id="cphone" placeholder="Phone (optional)" />
+      </div>
+      <div class="err" id="err"></div>
+      <button class="primary" id="complete" disabled>Complete sale (F9)</button>
+      <div class="muted" style="margin-top:8px" id="who"></div>
+    </div>
+    <div class="card pend">
+      <div style="font-weight:600;margin-bottom:6px">Waiting to upload</div>
+      <div id="pending" class="muted">None</div>
+    </div>
+  </div>
+</main>
+<script>
+const api = window.shopdeskDesktop.offline;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const f2 = (n) => (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+let cat = null, queue = [], used = new Set(), cart = [], hits = [], sel = 0, busy = false;
+
+async function load() {
+  const d = await api.data();
+  cat = d.catalog; queue = d.queue; used = new Set(d.usedUnits);
+  $("who").textContent = `Cashier: ${cat.user.name} · prices from ${new Date(cat.at).toLocaleString("en-GB")}`;
+  $("catInfo").textContent = `${cat.products.length} products and ${cat.units.length} IMEIs saved on this PC`;
+  $("method").innerHTML = cat.payment_methods.map((m) => `<option value="${m.id}">${esc(m.label)}</option>`).join("");
+  $("vatRow").style.display = cat.shop.vat_registered ? "" : "none";
+  $("vatLabel").textContent = `VAT ${cat.shop.vat_rate}%`;
+  renderPending(); render();
+}
+
+function freeUnits(pid) {
+  const inCart = new Set(cart.map((l) => l.unit_id).filter(Boolean));
+  return cat.units.filter((u) => u.product_id === pid && !used.has(u.id) && !inCart.has(u.id));
+}
+function search(text) {
+  const t = text.trim().toLowerCase();
+  if (!t) return [];
+  const unit = cat.units.find((u) => (u.imei === text.trim() || u.imei2 === text.trim()) && !used.has(u.id));
+  if (unit) { const p = cat.products.find((x) => x.id === unit.product_id); if (p) return [{ p, unit }]; }
+  const exact = cat.products.filter((p) => [p.barcode, p.sku].some((c) => c && c.toLowerCase() === t));
+  if (exact.length) return exact.map((p) => ({ p }));
+  return cat.products.filter((p) => `${p.brand || ""} ${p.name} ${p.sku || ""}`.toLowerCase().includes(t)).slice(0, 30).map((p) => ({ p }));
+}
+function add(h) {
+  const p = h.p;
+  if (p.track_serial) {
+    const units = freeUnits(p.id);
+    const unit = h.unit || units[0];
+    if (!unit) return error(`No IMEI of ${p.name} left in stock on this PC`);
+    cart.push({ key: Math.random(), p, unit_id: unit.id, qty: 1, price: unit.price ?? p.price, discount: 0, margin: !!unit.margin_scheme });
+  } else {
+    const line = cart.find((l) => l.p.id === p.id && !l.unit_id);
+    if (line) line.qty += 1;
+    else cart.push({ key: Math.random(), p, unit_id: null, qty: 1, price: p.price, discount: 0, margin: false });
+  }
+  $("search").value = ""; hits = []; renderResults(); render(); error("");
+}
+function totals() {
+  const r = cat.shop.vat_registered ? Number(cat.shop.vat_rate) : 0;
+  let total = 0, vat = 0, items = 0;
+  for (const l of cart) {
+    const gross = l.qty * Number(l.price) - Number(l.discount || 0);
+    items += l.qty;
+    if (r > 0 && !l.margin) {
+      if (cat.shop.prices_include_vat) { vat += (gross * r) / (100 + r); total += gross; }
+      else { vat += (gross * r) / 100; total += gross * (1 + r / 100); }
+    } else total += gross;
+    l.total = cat.shop.prices_include_vat || !r || l.margin ? gross : gross * (1 + r / 100);
+  }
+  return { total: Math.round(total * 100) / 100, vat: Math.round(vat * 100) / 100, net: Math.round((total - vat) * 100) / 100, items };
+}
+function render() {
+  const perms = cat.user.perms;
+  const t = totals();
+  $("cart").innerHTML = cart.map((l, i) => {
+    const units = l.unit_id ? [cat.units.find((u) => u.id === l.unit_id), ...freeUnits(l.p.id)].filter(Boolean) : [];
+    return `<tr>
+      <td><div style="font-weight:600">${esc(l.p.brand ? l.p.brand + " " : "")}${esc(l.p.name)}</div>
+        ${l.unit_id ? `<select data-i="${i}" data-f="unit">${units.map((u) => `<option value="${u.id}" ${u.id === l.unit_id ? "selected" : ""}>IMEI ${esc(u.imei)}</option>`).join("")}</select>` : ""}</td>
+      <td>${l.unit_id ? "1" : `<input data-i="${i}" data-f="qty" value="${l.qty}" inputmode="numeric" />`}</td>
+      <td><input class="num" data-i="${i}" data-f="price" value="${l.price}" ${perms.price ? "" : "disabled"} /></td>
+      <td><input class="num" data-i="${i}" data-f="discount" value="${l.discount || ""}" ${perms.discount ? "" : "disabled"} placeholder="0" /></td>
+      <td class="num">${f2(l.total)}</td>
+      <td><button class="x" data-rm="${i}">✕</button></td></tr>`;
+  }).join("");
+  $("empty").style.display = cart.length ? "none" : "";
+  $("tItems").textContent = t.items; $("tVat").textContent = f2(t.vat); $("tTotal").textContent = `${cat.shop.currency} ${f2(t.total)}`;
+  const paid = $("paid").value === "" ? t.total : Number($("paid").value);
+  const ch = paid - t.total;
+  $("changeLabel").textContent = ch < -0.004 ? "Balance due" : "Change";
+  $("change").textContent = cart.length ? f2(Math.abs(ch)) : "";
+  $("complete").disabled = !cart.length || busy;
+}
+function renderResults() {
+  $("results").innerHTML = hits.map((h, i) => `<div class="res ${i === sel ? "sel" : ""}" data-h="${i}"><span>${esc(h.p.brand ? h.p.brand + " " : "")}${esc(h.p.name)}${h.unit ? ` · IMEI ${esc(h.unit.imei)}` : ""}</span><span class="muted">${h.p.track_serial ? `${freeUnits(h.p.id).length} IMEI` : h.p.stock == null ? "" : `stock ${h.p.stock}`} · ${f2(h.unit?.price ?? h.p.price)}</span></div>`).join("");
+}
+function renderPending() {
+  const waiting = queue.filter((s) => !s.error).length, failed = queue.filter((s) => s.error).length;
+  $("pendingCount").textContent = queue.length ? `${waiting} sale${waiting === 1 ? "" : "s"} waiting${failed ? ` · ${failed} need attention` : ""}` : "";
+  $("pending").innerHTML = queue.length ? queue.slice().reverse().map((s) =>
+    `<div class="row" style="padding:5px 0;border-top:1px solid #f1f5f9"><span>${esc(s.offline_no)} <span class="muted">${new Date(s.created_at).toLocaleTimeString("en-GB")}</span>
+      ${s.error ? `<span class="tag fail" title="${esc(s.error)}">${esc(s.error)}</span>` : `<span class="tag">waiting</span>`}</span>
+      <span class="num">${f2(s.total)} ${s.error ? `<button class="x" data-del="${esc(s.offline_id)}" title="Remove (after fixing it by hand)">✕</button>` : ""}</span></div>`).join("") : "None";
+}
+function error(m) { $("err").textContent = m; }
+
+function receiptHtml(s, t) {
+  const sh = cat.shop, w = sh.receipt_width === "58" ? 48 : 72;
+  const d = new Date(s.created_at);
+  const line = (a, b, bold) => `<div style="display:flex;justify-content:space-between;${bold ? "font-weight:700;font-size:1.15em" : ""}"><span>${a}</span><span>${b}</span></div>`;
+  const rule = `<div style="border-top:1px solid #000;margin:4px 0"></div>`;
+  return `<html><body style="margin:0"><div data-receipt style="width:${w}mm;margin:0 auto;padding:1mm 0 4mm;font:${w === 48 ? 10 : 11.5}px Arial,sans-serif;color:#000">
+  <div style="text-align:center;font-weight:700;text-transform:uppercase"><div style="font-size:1.3em">${esc(sh.shop_name)}</div>
+  ${sh.address ? `<div>${esc([sh.address, sh.emirate, "U.A.E"].filter(Boolean).join(" , "))}</div>` : ""}${sh.phone ? `<div>MOB: ${esc(sh.phone)}</div>` : ""}
+  ${sh.vat_registered && sh.trn ? `<div style="margin-top:6px">TRN :${esc(sh.trn)}</div>` : ""}</div>${rule}
+  <div style="text-align:center;font:700 1.35em 'Times New Roman',serif">${sh.vat_registered ? "TAX INVOICE فاتورة ضريبية" : "INVOICE فاتورة"}</div>${rule}
+  ${line("Ref No.", esc(s.offline_no))}${line("Date", d.toLocaleDateString("en-GB"))}${line("Time", d.toLocaleTimeString("en-US"))}
+  ${line("Counter", esc(sh.receipt_counter || "1"))}${line("Cashier", esc(cat.user.name))}${line("Payment Mode", esc((cat.payment_methods.find((m) => m.id === s.payments[0]?.method) || {}).label || "").toUpperCase())}
+  ${line("Customer", esc((s.customer.name || "GENERAL").toUpperCase()))}${rule}
+  ${s.view.map((l) => `<div style="font-weight:700;text-transform:uppercase">${esc(l.name)}</div>${l.imei ? `<div>IMEI ${esc(l.imei)}</div>` : ""}${line(`${l.qty} x ${f2(l.price)}${l.discount ? ` -${f2(l.discount)}` : ""}`, f2(l.total))}`).join("")}${rule}
+  ${line("Total Amount" + (sh.vat_registered ? " (In. VAT)" : ""), f2(t.total), true)}
+  ${line("Received", f2(s.received))}${line(s.received - t.total < -0.004 ? "Balance Due" : "Balance", f2(Math.abs(s.received - t.total)))}
+  ${sh.vat_registered ? rule + line(`VAT ${sh.vat_rate}% on ${f2(t.net)}`, f2(t.vat)) : ""}${rule}
+  <div style="text-align:center;margin-top:6px;font-size:.9em">Saved offline. The tax invoice number is given when the shop is back online.</div>
+  ${sh.invoice_terms ? `<div style="text-align:center;margin-top:6px;font-size:.9em">${esc(sh.invoice_terms)}</div>` : ""}
+  <div style="text-align:center;margin-top:6px">*${esc(s.offline_no)}*</div></div></body></html>`;
+}
+
+async function complete() {
+  if (!cart.length || busy) return;
+  const t = totals();
+  const method = $("method").value;
+  const received = $("paid").value === "" ? t.total : Number($("paid").value);
+  if (!(received >= 0)) return error("Check the amount received");
+  if (received + 0.004 < t.total && !cat.user.perms.credit) return error("Full payment is needed: this account can't sell on credit");
+  busy = true; render();
+  const sale = {
+    created_at: new Date().toISOString(),
+    customer: { name: $("cname").value.trim(), phone: $("cphone").value.trim() },
+    lines: cart.map((l) => ({ product_id: l.p.id, unit_id: l.unit_id, qty: l.qty, unit_price: Number(l.price), discount: Number(l.discount || 0) })),
+    // Only cash can be more than the total (the change goes back); other methods are capped at the total.
+    payments: method === "credit" ? [{ method: "credit", amount: 0 }] : [{ method, amount: Math.round((method === "cash" ? received : Math.min(received, t.total)) * 100) / 100 }],
+    total: t.total,
+    received,
+    view: cart.map((l) => ({ name: `${l.p.brand ? l.p.brand + " " : ""}${l.p.name}`, imei: l.unit_id ? cat.units.find((u) => u.id === l.unit_id)?.imei : "", qty: l.qty, price: Number(l.price), discount: Number(l.discount || 0), total: l.total })),
+  };
+  const r = await api.save(sale);
+  if (!r.ok) { busy = false; render(); return error(r.error || "Could not save"); }
+  sale.offline_no = r.offline_no;
+  api.print(receiptHtml(sale, t), cat.shop.receipt_width === "58" ? "58" : "80");
+  cart = []; $("paid").value = ""; $("cname").value = ""; $("cphone").value = ""; busy = false;
+  await load();
+  error(""); $("err").innerHTML = `<span class="ok">Saved as ${esc(r.offline_no)}. It uploads when the internet is back.</span>`;
+  $("search").focus();
+}
+
+$("search").addEventListener("input", (e) => { hits = search(e.target.value); sel = 0; renderResults(); });
+$("search").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { sel = Math.min(sel + 1, hits.length - 1); renderResults(); e.preventDefault(); }
+  if (e.key === "ArrowUp") { sel = Math.max(sel - 1, 0); renderResults(); e.preventDefault(); }
+  if (e.key === "Enter") { hits = search(e.target.value); if (hits[sel]) add(hits[sel]); else if (e.target.value.trim()) error("Not found in the products saved on this PC"); }
+});
+$("results").addEventListener("click", (e) => { const el = e.target.closest("[data-h]"); if (el) add(hits[Number(el.dataset.h)]); });
+$("cart").addEventListener("change", (e) => {
+  const i = Number(e.target.dataset.i), f = e.target.dataset.f; if (!cart[i]) return;
+  if (f === "unit") { cart[i].unit_id = Number(e.target.value); const u = cat.units.find((x) => x.id === cart[i].unit_id); cart[i].price = u?.price ?? cart[i].p.price; cart[i].margin = !!u?.margin_scheme; }
+  if (f === "qty") cart[i].qty = Math.max(1, Math.round(Number(e.target.value) || 1));
+  if (f === "price") cart[i].price = Math.max(0, Number(e.target.value) || 0);
+  if (f === "discount") cart[i].discount = Math.max(0, Number(e.target.value) || 0);
+  render();
+});
+$("cart").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) { cart.splice(Number(b.dataset.rm), 1); render(); } });
+$("pending").addEventListener("click", async (e) => { const b = e.target.closest("[data-del]"); if (b && confirm("Remove this sale from the list? Only do this after entering it by hand.")) { await api.remove(b.dataset.del); load(); } });
+$("paid").addEventListener("input", render);
+$("complete").onclick = complete;
+$("retry").onclick = () => { $("barText").textContent = "Checking the connection…"; api.retry(); };
+document.addEventListener("keydown", (e) => { if (e.key === "F9") { e.preventDefault(); complete(); } });
+
+// Called by the app when the connection comes back while a sale is being entered.
+window.__cartEmpty = () => cart.length === 0;
+window.__backOnline = () => {
+  $("bar").classList.add("back"); $("barTitle").textContent = "Internet is back";
+  $("barText").textContent = "Finish this sale; the app goes online and uploads everything right after.";
+};
+window.__refresh = load;
+load();
+</script>
+</body>
+</html>

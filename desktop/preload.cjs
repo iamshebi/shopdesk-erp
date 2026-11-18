@@ -13,6 +13,14 @@ contextBridge.exposeInMainWorld("shopdeskDesktop", {
     copy: (text) => ipcRenderer.invoke("sd:copy", text),
     quit: () => ipcRenderer.invoke("sd:quit"),
   },
+  offline: {
+    data: () => ipcRenderer.invoke("sd:off-data"),
+    save: (sale) => ipcRenderer.invoke("sd:off-save", sale),
+    print: (html, width) => ipcRenderer.invoke("sd:off-print", { html, width }),
+    retry: () => ipcRenderer.invoke("sd:off-retry"),
+    remove: (id) => ipcRenderer.invoke("sd:off-remove", id),
+    open: () => ipcRenderer.invoke("sd:off-open"),
+  },
   printers: {
     list: () => ipcRenderer.invoke("sd:printers-list"),
     save: (prefs) => ipcRenderer.invoke("sd:printers-save", prefs),

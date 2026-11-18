@@ -6,6 +6,9 @@ import { getSettings } from "@/lib/settings";
 import { log } from "@/lib/activity";
 import { createSale, SaleError, type SaleInput } from "@/lib/sales";
 import { num } from "@/lib/util";
+import { after } from "next/server";
+import { autoMessage } from "@/lib/auto-messages";
+import { baseUrl, saleToken } from "@/lib/public-link";
 
 export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id?: number; error?: string }> {
   const user = await requireUser("pos");
@@ -45,6 +48,10 @@ export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id
     const { fireWebhook } = await import("@/lib/webhooks");
     const sale = (await q<any>("SELECT id, number, total, paid, customer_name, customer_phone, coupon_code FROM sales WHERE id=$1", [id]))[0];
     await fireWebhook("sale.created", sale);
+    if (sale.customer_phone) {
+      const link = `${await baseUrl()}/i/${await saleToken(id)}`;
+      after(() => autoMessage("sale", sale.customer_phone, { number: sale.number, total: Number(sale.total), link }));
+    }
     revalidatePath("/");
     revalidatePath("/sales");
     revalidatePath("/products");

@@ -104,6 +104,10 @@ export async function saveMessaging(fd: FormData) {
   const user = await requireUser("integrations");
   const sms = str(fd, "sms_key"), wa = str(fd, "whatsapp_token");
   await saveSettings({ sms_provider_url: str(fd, "sms_provider_url"), whatsapp_phone_id: str(fd, "whatsapp_phone_id"),
+    whatsapp_template: str(fd, "whatsapp_template").replace(/[^a-z0-9_]/gi, "").toLowerCase(),
+    notify_channel: ["whatsapp", "sms", "both"].includes(str(fd, "notify_channel")) ? str(fd, "notify_channel") : "whatsapp",
+    notify_sale: fd.get("notify_sale") === "on", notify_repair_received: fd.get("notify_repair_received") === "on",
+    notify_repair_ready: fd.get("notify_repair_ready") === "on", notify_repair_delivered: fd.get("notify_repair_delivered") === "on",
     ...(sms ? { sms_key_enc: await encryptField(sms) } : {}), ...(wa ? { whatsapp_token_enc: await encryptField(wa) } : {}),
     ...(str(fd, "forget") === "on" ? { sms_key_enc: "", whatsapp_token_enc: "" } : {}) });
   await log(user.id, "Messaging settings changed", "", P);

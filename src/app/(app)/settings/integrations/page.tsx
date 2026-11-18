@@ -59,6 +59,21 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             <div><label className="label">WhatsApp access token {s.whatsapp_token_enc && <Badge tone="green">saved</Badge>}</label><input name="whatsapp_token" type="password" className="input" placeholder={s.whatsapp_token_enc ? "•••••• (leave blank to keep)" : ""} /></div>
             <div><label className="label">SMS gateway link (use {"{to}"} {"{text}"} {"{key}"})</label><input name="sms_provider_url" defaultValue={s.sms_provider_url} className="input" placeholder="https://api.provider.ae/send?to={to}&text={text}&key={key}" /></div>
             <div><label className="label">SMS key {s.sms_key_enc && <Badge tone="green">saved</Badge>}</label><input name="sms_key" type="password" className="input" placeholder={s.sms_key_enc ? "•••••• (leave blank to keep)" : ""} /></div>
+            <div><label className="label">WhatsApp template name (approved by Meta)</label><input name="whatsapp_template" defaultValue={s.whatsapp_template} className="input" placeholder="shop_update" /></div>
+            <div><label className="label">Send automatic messages by</label>
+              <select name="notify_channel" defaultValue={s.notify_channel} className="input">
+                <option value="whatsapp">WhatsApp (SMS if WhatsApp fails)</option><option value="sms">SMS only</option><option value="both">WhatsApp and SMS</option>
+              </select></div>
+            <div className="sm:col-span-2 rounded-lg bg-slate-50 p-3 text-sm">
+              <div className="mb-2 font-medium">Automatic customer messages</div>
+              <div className="grid gap-1 sm:grid-cols-2">
+                <label className="flex items-center gap-2"><input type="checkbox" name="notify_sale" defaultChecked={s.notify_sale} /> After a sale: thank-you with the invoice link</label>
+                <label className="flex items-center gap-2"><input type="checkbox" name="notify_repair_received" defaultChecked={s.notify_repair_received} /> Repair received: job number and estimate</label>
+                <label className="flex items-center gap-2"><input type="checkbox" name="notify_repair_ready" defaultChecked={s.notify_repair_ready} /> Repair ready for pickup</label>
+                <label className="flex items-center gap-2"><input type="checkbox" name="notify_repair_delivered" defaultChecked={s.notify_repair_delivered} /> Repair delivered</label>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Sent only when the customer&apos;s phone number is entered. Every message (sent or failed) appears in Settings → Activity. WhatsApp only delivers free text to customers who messaged the shop in the last 24 hours; for everyone else create a template in Meta WhatsApp Manager with one variable as the whole body (e.g. <code>{"{{1}}"}</code>) and enter its name above.</p>
+            </div>
             {(s.sms_key_enc || s.whatsapp_token_enc) && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="forget" /> Remove saved keys</label>}
             <div className="sm:col-span-2"><Submit>Save messaging settings</Submit></div>
           </form>

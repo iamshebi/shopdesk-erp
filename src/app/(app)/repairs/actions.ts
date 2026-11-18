@@ -7,6 +7,9 @@ import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { createSale, SaleError } from "@/lib/sales";
 import { str, numf, r2 } from "@/lib/util";
+import { after } from "next/server";
+import { autoMessage } from "@/lib/auto-messages";
+import { baseUrl, saleToken } from "@/lib/public-link";
 
 export async function createRepair(fd: FormData) {
   const user = await requireUser("repairs");
@@ -31,6 +34,13 @@ export async function createRepair(fd: FormData) {
     await log(user.id, "Repair job created", `${number} · ${str(fd, "device")} · ${name}`, `/repairs/${r.id}`, t);
     return r.id;
   });
+  if (phone) {
+    const v = { number: "", device: str(fd, "device"), estimate: numf(fd, "estimate"), ready_by: str(fd, "promised_at") || null };
+    after(async () => {
+      const r = await one<{ number: string }>("SELECT number FROM repairs WHERE id=$1", [id]);
+      await autoMessage("repair_received", phone, { ...v, number: r?.number ?? "" });
+    });
+  }
   revalidatePath("/repairs");
   redirect(`/repairs/${id}?new=1`);
 }
@@ -42,8 +52,11 @@ export async function updateRepairStatus(fd: FormData) {
   if (status === "delivered") redirect(`/repairs/${id}`);
   await q("UPDATE repairs SET status=$1, updated_at=now() WHERE id=$2 AND status <> 'delivered'", [status, id]);
   await q("INSERT INTO repair_logs (repair_id, status, note, user_id) VALUES ($1,$2,$3,$4)", [id, status, str(fd, "note"), user.id]);
-  const r = await one<{ number: string }>("SELECT number FROM repairs WHERE id=$1", [id]);
+  const r = await one<{ number: string; customer_phone: string; device: string; estimate: number; final_charge: number | null }>("SELECT number, customer_phone, device, estimate, final_charge FROM repairs WHERE id=$1", [id]);
   await log(user.id, "Repair status", `${r?.number} → ${status.replace("_", " ")}`, `/repairs/${id}`);
+  if (status === "ready" && r?.customer_phone) {
+    after(() => autoMessage("repair_ready", r.customer_phone, { number: r.number, device: r.device, charge: Number(r.final_charge ?? r.estimate) || 0 }));
+  }
   revalidatePath(`/repairs/${id}`);
   revalidatePath("/repairs");
 }
@@ -89,6 +102,11 @@ export async function deliverRepair(fd: FormData) {
   } catch (e) {
     if (e instanceof SaleError) redirect(`/repairs/${id}?err=${encodeURIComponent(e.message)}`);
     throw e;
+  }
+  const done = await one<{ number: string; customer_phone: string; device: string }>("SELECT number, customer_phone, device FROM repairs WHERE id=$1", [id]);
+  if (done?.customer_phone) {
+    const link = `${await baseUrl()}/i/${await saleToken(saleId)}`;
+    after(() => autoMessage("repair_delivered", done.customer_phone, { number: done.number, device: done.device, link }));
   }
   revalidatePath("/repairs");
   redirect(`/sales/${saleId}?new=1`);

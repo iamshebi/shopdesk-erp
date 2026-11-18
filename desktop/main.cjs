@@ -192,10 +192,12 @@ function requireActivation() {
 // Online: downloads the backup with the signed-in user's session (needs the "data" permission, e.g. the owner).
 async function fetchOnlineBackup() {
   const { session } = require("electron");
-  const res = await session.defaultSession.fetch(`${BASE}/api/backup`, { redirect: "manual" });
-  if (res.status !== 200) {
-    const err = new Error(res.status >= 300 && res.status < 400 ? "Sign in as the owner to take backups" : `Backup failed: HTTP ${res.status}`);
-    err.notSignedIn = res.status >= 300 && res.status < 400 || res.status === 401 || res.status === 403;
+  // Signed out or no permission: the site redirects to the login page (HTML) instead of sending the file.
+  const res = await session.defaultSession.fetch(`${BASE}/api/backup`, { cache: "no-store" });
+  const isJson = (res.headers.get("content-type") || "").includes("application/json");
+  if (res.status !== 200 || !isJson) {
+    const err = new Error(res.status === 200 ? "Sign in as the owner to take backups" : `Backup failed: HTTP ${res.status}`);
+    err.notSignedIn = res.status === 200 || res.status === 401 || res.status === 403;
     throw err;
   }
   return Buffer.from(await res.arrayBuffer());
@@ -400,7 +402,7 @@ function buildMenu() {
         { label: "Open backups folder", click: () => { fs.mkdirSync(backupDir, { recursive: true }); shell.openPath(backupDir); } },
         { type: "separator" },
         { label: "Printer setup…", click: openPrinterSetup },
-        ...(ONLINE ? [{ type: "separator" }, { label: "Move offline data online…", click: () => moveOfflineDataOnline(true) }] : []),
+        ...(ONLINE ? [{ type: "separator" }, { label: "Offline till", click: () => enterOffline("opened from menu") }, { label: "Offline sales…", click: showOfflineSales }, { label: "Move offline data online…", click: () => moveOfflineDataOnline(true) }] : []),
         { type: "separator" },
         {
           label: "Use on other devices…",
@@ -679,26 +681,268 @@ async function checkForUpdatesNow() {
   }
 }
 
-// ---------- online mode ----------
+// ---------- online mode, with an offline till ----------
+// The app shows the live website. While online it keeps a copy of the products, IMEIs and receipt details
+// on this PC. If the internet drops, it switches to a small offline till: sales are saved on this PC with
+// a temporary number (OFF-…), the receipt prints, and a red bar shows how many sales are waiting.
+// When the internet is back the sales upload by themselves and get their normal invoice numbers.
+const catalogFile = path.join(userData, "offline-catalog.json");
+const queueFile = path.join(userData, "offline-queue.json");
+const OFFLINE_PAGE = path.join(__dirname, "offline.html");
+let offlineMode = false;
+let retryTimer = null;
+let lastCatalogAt = 0;
+let syncing = false;
+
+function readJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return fallback; }
+}
+function writeJson(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file + ".tmp", JSON.stringify(data));
+  fs.renameSync(file + ".tmp", file);
+}
+const readQueue = () => readJson(queueFile, { sales: [], seq: 0 });
+
 function offlinePage(msg) {
   return "data:text/html;charset=utf-8," + encodeURIComponent(
     `<html><body style="margin:0;display:grid;place-items:center;height:100vh;font-family:Segoe UI,sans-serif;background:#f6f7f9;color:#475569">
-     <div style="text-align:center;max-width:420px"><div style="font-size:22px;font-weight:600;color:#0f172a">${brand.productName}</div>
+     <div style="text-align:center;max-width:460px"><div style="font-size:22px;font-weight:600;color:#0f172a">${brand.productName}</div>
      <div style="margin-top:10px">${msg}</div><div style="margin-top:6px;font-size:12px">Trying again automatically…</div></div></body></html>`);
 }
-let retryTimer = null;
+
+async function netFetch(url, opts = {}, ms = 8000) {
+  const { session } = require("electron");
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try { return await session.defaultSession.fetch(url, { ...opts, signal: ctl.signal }); } finally { clearTimeout(timer); }
+}
+async function isOnline() {
+  // A small public file that never redirects (the login page redirects signed-in users).
+  try { const r = await netFetch(`${BASE}/manifest.webmanifest?ping=${Date.now()}`, { cache: "no-store" }, 6000); return r.status === 200; } catch { return false; }
+}
+
+/** Saves the products / IMEIs / receipt details for the offline till (needs a signed-in user with the till permission). */
+async function refreshCatalog(force) {
+  if (!force && Date.now() - lastCatalogAt < 5 * 60 * 1000) return;
+  lastCatalogAt = Date.now();
+  try {
+    const r = await netFetch(`${BASE}/api/desktop/catalog`, {}, 30000);
+    if (r.status !== 200) return;
+    const data = await r.json();
+    if (Array.isArray(data.products)) writeJson(catalogFile, data);
+  } catch (e) {
+    log(`offline catalog: ${e.message}`);
+  }
+}
+
+/** Uploads waiting offline sales. Returns { uploaded, failed, signedOut }. */
+async function syncQueue() {
+  if (syncing) return { uploaded: 0, failed: 0 };
+  const q = readQueue();
+  const waiting = q.sales.filter((s) => !s.error);
+  if (!waiting.length) return { uploaded: 0, failed: 0 };
+  syncing = true;
+  try {
+    const payload = waiting.map(({ offline_id, offline_no, created_at, customer, lines, payments }) => ({ offline_id, offline_no, created_at, customer, lines, payments }));
+    const r = await netFetch(`${BASE}/api/desktop/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sales: payload }) }, 120000);
+    if (r.status === 401) return { uploaded: 0, failed: 0, signedOut: true };
+    if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
+    const { results } = await r.json();
+    const byId = new Map(results.map((x) => [x.offline_id, x]));
+    const now = readQueue(); // re-read: a sale may have been added meanwhile
+    let uploaded = 0, failed = 0;
+    const done = [];
+    now.sales = now.sales.filter((s) => {
+      const res = byId.get(s.offline_id);
+      if (!res) return true;
+      if (res.number) { uploaded++; done.push(`${s.offline_no} → ${res.number}`); return false; }
+      s.error = res.error || "Could not upload"; failed++;
+      return true;
+    });
+    now.uploaded = [...done, ...(now.uploaded || [])].slice(0, 200);
+    writeJson(queueFile, now);
+    log(`offline sync: ${uploaded} uploaded, ${failed} failed ${done.join(", ")}`);
+    if (uploaded) refreshCatalog(true);
+    return { uploaded, failed };
+  } catch (e) {
+    log(`offline sync failed: ${e.message}`);
+    return { uploaded: 0, failed: 0, error: e.message };
+  } finally {
+    syncing = false;
+  }
+}
+
+/** Small bar on top of the online pages: lost connection, or offline sales still waiting. */
+function showStatusBar(kind, text) {
+  if (!win || offlineMode) return;
+  const js = `(() => {
+    let b = document.getElementById("sd-status-bar");
+    const kind = ${JSON.stringify(kind)};
+    if (!kind) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement("div"); b.id = "sd-status-bar"; document.body.appendChild(b); }
+    b.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:8px 14px;font:600 13px Segoe UI,sans-serif;color:#fff;display:flex;gap:12px;align-items:center;justify-content:center;background:" + (kind === "offline" ? "#b91c1c" : "#b45309");
+    b.innerHTML = ${JSON.stringify(text)} + (kind === "offline" ? ' <button style="font:600 12px Segoe UI;border:0;border-radius:8px;padding:5px 10px;cursor:pointer" onclick="window.shopdeskDesktop.offline.open()">Open offline till</button>' : "");
+  })()`;
+  win.webContents.executeJavaScript(js).catch(() => {});
+}
+function updatePendingBar() {
+  const q = readQueue();
+  const waiting = q.sales.filter((s) => !s.error).length, failed = q.sales.length - waiting;
+  if (!q.sales.length) return showStatusBar("", "");
+  showStatusBar("pending", `${waiting} offline sale${waiting === 1 ? "" : "s"} waiting to upload${failed ? ` · ${failed} could not be uploaded (File → Offline sales)` : ""}`);
+}
+
+function enterOffline(reason) {
+  if (offlineMode) return;
+  log(`offline: ${reason}`);
+  if (fs.existsSync(catalogFile)) {
+    offlineMode = true;
+    win.loadFile(OFFLINE_PAGE);
+    win.setTitle(`${brand.productName} · OFFLINE`);
+  } else {
+    win.loadURL(offlinePage("No internet connection. Check the shop Wi-Fi or cable.<br><br>The offline till becomes available after the first sign-in while online."));
+  }
+  scheduleReconnect(10000);
+}
+
+function scheduleReconnect(ms) {
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(tryReconnect, ms);
+}
+
+async function tryReconnect() {
+  if (!(await isOnline())) return scheduleReconnect(10000);
+  if (offlineMode) {
+    const empty = await win.webContents.executeJavaScript("window.__cartEmpty ? window.__cartEmpty() : true").catch(() => true);
+    if (!empty) {
+      win.webContents.executeJavaScript("window.__backOnline && window.__backOnline()").catch(() => {});
+      return scheduleReconnect(5000);
+    }
+  }
+  const r = await syncQueue();
+  offlineMode = false;
+  win.setTitle(brand.productName);
+  if (r.signedOut) {
+    win.loadURL(BASE + "/login");
+    dialog.showMessageBox(win, { message: "Back online", detail: "Please sign in. The sales made offline upload as soon as you are signed in." });
+    return;
+  }
+  win.loadURL(BASE + "/");
+  if (r.uploaded || r.failed) {
+    dialog.showMessageBox(win, {
+      message: "Back online",
+      detail: `${r.uploaded} offline sale${r.uploaded === 1 ? "" : "s"} uploaded and given invoice numbers.` + (r.failed ? `\n\n${r.failed} could not be uploaded (for example an IMEI that was sold elsewhere meanwhile). See File → Offline sales.` : ""),
+    });
+  }
+}
+
 function openOnline() {
   clearTimeout(retryTimer);
+  offlineMode = false;
   win.loadURL(BASE + "/").catch(() => {});
 }
+
 function watchConnection() {
   win.webContents.on("did-fail-load", (_e, code, _desc, url, isMain) => {
-    // -3 is "aborted" (a normal redirect); only show the offline screen when the app itself can't load.
+    // -3 is "aborted" (a normal redirect); only react when the app itself can't load.
     if (!isMain || code === -3 || !String(url).startsWith(BASE)) return;
     log(`online: load failed ${code} ${url}`);
-    win.loadURL(offlinePage("No internet connection. Check the shop Wi-Fi or cable."));
-    clearTimeout(retryTimer);
-    retryTimer = setTimeout(openOnline, 10000);
+    enterOffline(`page failed to load (${code})`);
+  });
+  // A router, proxy or captive portal may answer with its own error page instead of failing.
+  win.webContents.on("did-navigate", async (_e, url, code) => {
+    if (!String(url).startsWith(BASE) || !(code >= 500 || code === 0)) return;
+    if (!(await isOnline())) enterOffline(`server answered ${code}`);
+  });
+  // The website changes pages without full reloads (e.g. right after signing in), so watch both.
+  const onPage = (full) => {
+    const url = win.webContents.getURL();
+    if (!url.startsWith(BASE)) return;
+    if (!url.includes("/login") && !url.includes("/setup")) {
+      refreshCatalog(false);
+      if (readQueue().sales.some((s) => !s.error)) syncQueue().then(updatePendingBar);
+    }
+    if (full) updatePendingBar();
+  };
+  win.webContents.on("did-finish-load", () => onPage(true));
+  win.webContents.on("did-navigate-in-page", () => onPage(false));
+  // Every 15 s: if the connection is lost while a page is open, say so at once (the page itself still shows).
+  let misses = 0;
+  setInterval(async () => {
+    if (offlineMode || !win) return;
+    if (await isOnline()) {
+      if (misses >= 2) updatePendingBar();
+      misses = 0;
+      const url = win.webContents.getURL();
+      if (url.startsWith(BASE) && !url.includes("/login")) refreshCatalog(false);
+      if (readQueue().sales.some((s) => !s.error)) syncQueue().then(updatePendingBar);
+      return;
+    }
+    misses++;
+    if (misses === 2) showStatusBar("offline", "No internet. Pages and the till can't save right now.");
+  }, 15000);
+}
+
+// Offline till <-> app
+const fromOffline = (e) => offlineMode && e.sender === (win && win.webContents) && e.sender.getURL().startsWith("file:");
+ipcMain.handle("sd:off-data", (e) => {
+  if (!fromOffline(e)) return null;
+  const q = readQueue();
+  const usedUnits = q.sales.filter((s) => !s.error).flatMap((s) => s.lines.map((l) => l.unit_id).filter(Boolean));
+  return { catalog: readJson(catalogFile, null), queue: q.sales, usedUnits };
+});
+ipcMain.handle("sd:off-save", (e, sale) => {
+  if (!fromOffline(e)) return { ok: false, error: "not allowed" };
+  if (!sale || !Array.isArray(sale.lines) || !sale.lines.length) return { ok: false, error: "Empty sale" };
+  const q = readQueue();
+  q.seq = (q.seq || 0) + 1;
+  const counter = String(readJson(catalogFile, {}).shop?.receipt_counter || "1").replace(/[^\w]/g, "") || "1";
+  const offline_no = `OFF-${counter}-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${String(q.seq).padStart(3, "0")}`;
+  q.sales.push({ ...sale, offline_id: crypto.randomUUID(), offline_no });
+  writeJson(queueFile, q);
+  log(`offline sale saved ${offline_no} total ${sale.total}`);
+  return { ok: true, offline_no };
+});
+ipcMain.handle("sd:off-print", async (e, { html, width } = {}) => {
+  if (!fromOffline(e) || typeof html !== "string") return { ok: false };
+  const t = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
+  try {
+    await t.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
+    return await printContents(t.webContents, "receipt", width === "58" ? "58" : "80");
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  } finally {
+    t.destroy();
+  }
+});
+ipcMain.handle("sd:off-retry", (e) => { if (fromOffline(e)) scheduleReconnect(0); });
+ipcMain.handle("sd:off-remove", (e, id) => {
+  if (!fromOffline(e)) return;
+  const q = readQueue();
+  const s = q.sales.find((x) => x.offline_id === id && x.error);
+  if (!s) return;
+  q.sales = q.sales.filter((x) => x !== s);
+  q.removed = [{ ...s, removedAt: new Date().toISOString() }, ...(q.removed || [])].slice(0, 100);
+  writeJson(queueFile, q);
+  log(`offline sale removed by user ${s.offline_no}`);
+});
+ipcMain.handle("sd:off-open", (e) => { if (e.sender.getURL().startsWith(BASE)) enterOffline("opened by user"); });
+
+function showOfflineSales() {
+  const q = readQueue();
+  const lines = q.sales.map((s) => `${s.offline_no}  ${new Date(s.created_at).toLocaleString("en-GB")}  ${Number(s.total).toFixed(2)}  ${s.error ? "NOT UPLOADED: " + s.error : "waiting"}`);
+  const up = (q.uploaded || []).slice(0, 15);
+  dialog.showMessageBox(win, {
+    message: "Offline sales",
+    detail: (lines.length ? `Waiting / problems:\n${lines.join("\n")}` : "Nothing waiting to upload.") + (up.length ? `\n\nRecently uploaded:\n${up.join("\n")}` : ""),
+    buttons: lines.length ? ["Upload now", "Close"] : ["Close"],
+  }).then(async (r) => {
+    if (lines.length && r.response === 0) {
+      const res = await syncQueue();
+      updatePendingBar();
+      dialog.showMessageBox(win, { message: res.signedOut ? "Sign in first" : res.error ? "No connection" : `${res.uploaded} uploaded${res.failed ? `, ${res.failed} not uploaded` : ""}` });
+    }
   });
 }
 
@@ -751,6 +995,8 @@ app.on("before-quit", async (e) => {
   if (ONLINE) {
     e.preventDefault();
     quitting = true;
+    // Try once more to upload offline sales; if it can't, they stay on this PC and upload next time.
+    await Promise.race([syncQueue(), new Promise((r) => setTimeout(r, 15000))]).catch(() => {});
     try {
       await Promise.race([backupNow(false), new Promise((r) => setTimeout(r, 15000))]);
     } finally {

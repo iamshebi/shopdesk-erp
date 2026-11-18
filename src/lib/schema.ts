@@ -298,7 +298,9 @@ export const MIGRATIONS: string[] = [
    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ;
-   ALTER TABLE sales ADD COLUMN IF NOT EXISTS tendered NUMERIC(12,2);`,
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS tendered NUMERIC(12,2);
+   ALTER TABLE sales ADD COLUMN IF NOT EXISTS offline_id TEXT;
+   CREATE UNIQUE INDEX IF NOT EXISTS sales_offline_id_idx ON sales (offline_id) WHERE offline_id IS NOT NULL;`,
 
   // 4. Products v2: status, tags, description, website and SEO fields, change history
   `ALTER TABLE products ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';

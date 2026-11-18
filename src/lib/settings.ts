@@ -60,6 +60,12 @@ export interface ShopSettings {
   receipt_width: string; // "80" or "58" (mm thermal paper)
   label_size: string; // "a4" sheet, or a label-roll size in mm like "50x25"
   auto_receipt: boolean; // print the thermal receipt by itself after every sale
+  notify_sale: boolean; // automatic customer messages (WhatsApp Business API / SMS)
+  notify_repair_received: boolean;
+  notify_repair_ready: boolean;
+  notify_repair_delivered: boolean;
+  notify_channel: string; // "whatsapp" (SMS if WhatsApp fails), "sms", or "both"
+  whatsapp_template: string; // approved Meta template with one body variable, for messages the shop starts
   receipt_counter: string; // counter number printed on receipts
 }
 
@@ -120,6 +126,12 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   receipt_width: "80",
   label_size: "a4",
   auto_receipt: true,
+  notify_sale: false,
+  notify_repair_received: false,
+  notify_repair_ready: false,
+  notify_repair_delivered: false,
+  notify_channel: "whatsapp",
+  whatsapp_template: "",
   receipt_counter: "1",
   couriers: "Aramex|https://www.aramex.com/track/results?ShipmentNumber={n}\nDHL|https://www.dhl.com/ae-en/home/tracking.html?tracking-id={n}\nEmirates Post|https://www.emiratespost.ae/track?trackno={n}\nOwn driver|",
 };

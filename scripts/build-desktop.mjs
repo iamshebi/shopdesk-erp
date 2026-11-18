@@ -40,7 +40,7 @@ fs.rmSync(path.join(server, ".env"), { force: true });
 
 const appDir = path.join(out, "app");
 fs.mkdirSync(appDir, { recursive: true });
-for (const f of ["main.cjs", "backup.cjs", "license.cjs", "migrate-dump.cjs", "preload.cjs", "activate.html", "printers.html"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
+for (const f of ["main.cjs", "backup.cjs", "license.cjs", "migrate-dump.cjs", "preload.cjs", "activate.html", "printers.html", "offline.html"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
 fs.copyFileSync(path.join(brandDir, "brand.json"), path.join(appDir, "brand.json"));
 fs.copyFileSync(path.join(brandDir, "icon.png"), path.join(appDir, "icon.png"));
 // The desktop shell's own packages: the updater, and PGlite to read an older offline database when moving it online.
