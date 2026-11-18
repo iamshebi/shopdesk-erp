@@ -18,9 +18,10 @@ export default async function SuppliersPage() {
   return (
     <div>
       <PageHeader title="Suppliers" subtitle="Who you buy stock from, and what you still owe them" />
-      <form action={addSupplier} className="card mb-6 grid gap-3 p-5 sm:grid-cols-6">
+      <form action={addSupplier} className="card mb-6 grid gap-3 p-5 sm:grid-cols-7">
         <input name="name" placeholder="Supplier name" className="input sm:col-span-2" required />
         <input name="phone" placeholder="Phone" className="input" />
+        <input name="email" type="email" placeholder="Email" className="input" />
         <input name="trn" placeholder="TRN" className="input" />
         <input name="address" placeholder="Address" className="input" />
         <Submit>Add supplier</Submit>
@@ -28,7 +29,7 @@ export default async function SuppliersPage() {
       <div className="card overflow-x-auto">
         {rows.length === 0 ? <Empty>No suppliers yet.</Empty> : (
           <table className="tbl">
-            <thead><tr><th>Supplier</th><th>Phone</th><th>TRN</th><th className="text-right">Bills</th><th className="text-right">Open orders</th><th className="text-right">On time</th><th className="text-right">Returned</th><th className="text-right">Total bought</th><th className="text-right">We owe</th></tr></thead>
+            <thead><tr><th>Supplier</th><th>Phone</th><th>TRN</th><th className="text-right">Bills</th><th className="text-right">Open orders</th><th className="text-right">On time</th><th className="text-right">Returned</th><th className="text-right">Total bought</th><th className="text-right">We owe</th><th></th></tr></thead>
             <tbody>
               {rows.map((s) => (
                 <tr key={s.id}>
@@ -38,6 +39,7 @@ export default async function SuppliersPage() {
                   <td className="text-right">{s.bills}</td><td className="text-right">{s.open_pos || "—"}</td><td className="text-right">{s.on_time != null ? `${s.on_time}%` : "—"}</td><td className="text-right tabular-nums">{Number(s.returned) > 0 ? num(s.returned) : "—"}</td>
                   <td className="text-right tabular-nums">{num(s.bought)}</td>
                   <td className={`text-right tabular-nums font-medium ${s.balance > 0 ? "text-red-600" : ""}`}>{num(s.balance)}</td>
+                  <td className="text-right"><Link href={`/suppliers/${s.id}`} className="btn-ghost btn-sm">Edit</Link></td>
                 </tr>
               ))}
             </tbody>
