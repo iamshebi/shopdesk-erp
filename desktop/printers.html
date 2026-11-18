@@ -29,6 +29,13 @@
   <label for="receipt">Receipts and repair tickets</label>
   <div class="hint">Your 80 mm or 58 mm thermal printer (Epson TM-T20/T82, Xprinter, Rongta…)</div>
   <div class="row"><select id="receipt"></select><button data-test="receipt">Test</button></div>
+  <label for="receiptLength" style="margin-top:10px">Receipt length</label>
+  <div class="hint">If receipts come out cut short, choose "Long page" or "Printer's own setting" and press Test.</div>
+  <select id="receiptLength">
+    <option value="auto">Fit to the receipt (saves paper)</option>
+    <option value="long">Long page (297 mm), printer cuts after the text</option>
+    <option value="driver">Printer's own paper setting</option>
+  </select>
 </div>
 <div class="card">
   <label for="label">Barcode and IMEI labels</label>
@@ -45,14 +52,15 @@
 <script>
 const api = window.shopdeskDesktop.printers;
 const $ = (id) => document.getElementById(id);
-api.list().then(({ printers, prefs }) => {
+api.list().then(({ printers, prefs, receiptLength }) => {
+  $("receiptLength").value = receiptLength || "auto";
   for (const kind of ["receipt", "label", "a4"]) {
     const sel = $(kind);
     sel.innerHTML = '<option value="">Ask every time</option>' + printers.map((p) => `<option>${p.name.replace(/</g, "&lt;")}</option>`).join("");
     sel.value = prefs[kind] || "";
   }
 });
-const current = () => ({ receipt: $("receipt").value, label: $("label").value, a4: $("a4").value });
+const current = () => ({ receipt: $("receipt").value, label: $("label").value, a4: $("a4").value, receiptLength: $("receiptLength").value });
 $("save").onclick = async () => { await api.save(current()); $("msg").textContent = "Saved."; };
 $("close").onclick = () => window.close();
 for (const b of document.querySelectorAll("[data-test]")) {

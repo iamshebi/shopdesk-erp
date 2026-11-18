@@ -19,6 +19,10 @@ const BASE = ONLINE ? new URL(brand.url).origin : `http://127.0.0.1:${PORT}`;
 const PRELOAD = path.join(__dirname, "preload.cjs");
 const LICENSE_ON = brand.license !== false;
 
+// Never show raw "JavaScript error in the main process" boxes to shop staff: log it and carry on.
+process.on("uncaughtException", (e) => { try { fs.appendFileSync(path.join(app.getPath("userData"), "server.log"), `${new Date().toISOString()} ERROR ${e && e.stack ? e.stack : e}\n`); } catch {} });
+process.on("unhandledRejection", (e) => { try { fs.appendFileSync(path.join(app.getPath("userData"), "server.log"), `${new Date().toISOString()} ERROR (promise) ${e && e.stack ? e.stack : e}\n`); } catch {} });
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
@@ -297,18 +301,28 @@ function printOptions(kind, size, receiptMm) {
   if (device) opts.deviceName = device;
   const m = /^(\d{2,3})x(\d{2,3})$/.exec(String(size || ""));
   if (kind === "label" && m) opts.pageSize = { width: Number(m[1]) * 1000, height: Number(m[2]) * 1000 };
-  // Receipts: page exactly as long as the receipt (plus a little for the cutter), so the roll isn't wasted
-  // and a long invoice isn't split over two "pages".
-  if (kind === "receipt" && receiptMm > 0) {
+  // Receipts (File → Printer setup → Receipt length):
+  //  "auto"   page as long as the receipt plus room for the cutter, so the roll isn't wasted;
+  //  "long"   a 297 mm page, for drivers that stop early with a custom length (the driver cuts after the content);
+  //  "driver" no page size at all: the printer driver's own paper setting decides.
+  // A measurement that looks wrong (less than 6 cm) falls back to the long page, so a receipt is never cut short.
+  if (kind === "receipt") {
     const width = String(size) === "58" ? 58 : 80;
-    opts.pageSize = { width: width * 1000, height: Math.round(Math.min(3000, Math.max(40, receiptMm + 6)) * 1000) };
+    const mode = readPrefs().receiptLength || "auto";
+    if (mode === "long" || (mode === "auto" && !(receiptMm >= 60))) opts.pageSize = { width: width * 1000, height: 297000 };
+    else if (mode === "auto") opts.pageSize = { width: width * 1000, height: Math.round(Math.min(3000, receiptMm + 12) * 1000) };
   }
   return opts;
 }
 async function measureReceiptMm(wc) {
   try {
     const px = await wc.executeJavaScript(
-      `(() => { const el = document.querySelector('[data-receipt]') || document.body; return el.getBoundingClientRect().height; })()`,
+      `(() => {
+        const el = document.querySelector('[data-receipt]');
+        if (!el) return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        const r = el.getBoundingClientRect();
+        return Math.max(r.height, el.scrollHeight, r.bottom + window.scrollY);
+      })()`,
     );
     return (Number(px) || 0) * 25.4 / 96 / (wc.getZoomFactor() || 1);
   } catch {
@@ -317,6 +331,7 @@ async function measureReceiptMm(wc) {
 }
 async function printContents(wc, kind, size) {
   const receiptMm = kind === "receipt" ? await measureReceiptMm(wc) : 0;
+  if (kind === "receipt") log(`print receipt: measured ${receiptMm.toFixed(1)} mm, length setting ${readPrefs().receiptLength || "auto"}`);
   return new Promise((resolve) => {
     wc.print(printOptions(kind, size, receiptMm), (ok, reason) => {
       if (!ok && reason && reason !== "cancelled") log(`print ${kind} failed: ${reason}`);
@@ -356,7 +371,7 @@ let printersWin = null;
 function openPrinterSetup() {
   if (printersWin) return printersWin.focus();
   printersWin = new BrowserWindow({
-    width: 560, height: 640, parent: win || undefined, title: "Printer setup", autoHideMenuBar: true, backgroundColor: "#f6f7f9",
+    width: 560, height: 760, parent: win || undefined, title: "Printer setup", autoHideMenuBar: true, backgroundColor: "#f6f7f9",
     webPreferences: { preload: PRELOAD, contextIsolation: true, sandbox: true },
   });
   printersWin.setMenu(null);
@@ -367,13 +382,13 @@ const fromPrinters = (e) => printersWin && e.sender === printersWin.webContents;
 ipcMain.handle("sd:printers-list", async (e) => {
   if (!fromPrinters(e)) return null;
   const printers = await e.sender.getPrintersAsync();
-  return { printers: printers.map((p) => ({ name: p.name })), prefs: readPrefs().printers || {} };
+  return { printers: printers.map((p) => ({ name: p.name })), prefs: readPrefs().printers || {}, receiptLength: readPrefs().receiptLength || "auto" };
 });
 ipcMain.handle("sd:printers-save", (e, p) => {
   if (!fromPrinters(e)) return;
   const clean = {};
   for (const k of ["receipt", "label", "a4"]) clean[k] = typeof p?.[k] === "string" ? p[k] : "";
-  savePrefs({ printers: clean });
+  savePrefs({ printers: clean, receiptLength: ["auto", "long", "driver"].includes(p?.receiptLength) ? p.receiptLength : "auto" });
 });
 ipcMain.handle("sd:printers-test", async (e, kind) => {
   if (!fromPrinters(e)) return { ok: false };
@@ -382,7 +397,9 @@ ipcMain.handle("sd:printers-test", async (e, kind) => {
   const w58 = prefs.receiptWidth === "58";
   const body = kind === "label"
     ? `<div style="font:bold 14px Arial;padding:2mm">${brand.productName}<br><span style="font-size:11px">Label printer test</span></div>`
-    : `<div data-receipt style="font:12px monospace;${narrow ? `width:${w58 ? 48 : 72}mm;margin:0 auto;` : ""}padding:3mm 0"><b>${brand.productName}</b><br>Printer test<br>${new Date().toLocaleString("en-GB")}<br>${"-".repeat(narrow ? (w58 ? 24 : 36) : 60)}<br>If this prints cleanly with no date or address at the top, the printer is ready.</div>`;
+    : `<div data-receipt style="font:12px monospace;${narrow ? `width:${w58 ? 48 : 72}mm;margin:0 auto;` : ""}padding:3mm 0"><b>${brand.productName}</b><br>Printer test<br>${new Date().toLocaleString("en-GB")}<br>${"-".repeat(narrow ? (w58 ? 24 : 36) : 60)}<br>` +
+      (narrow ? Array.from({ length: 20 }, (_, i) => `Line ${i + 1} of 20`).join("<br>") + `<br>${"-".repeat(w58 ? 24 : 36)}<br>` : "") +
+      `If all 20 lines print and nothing is cut, the printer is ready.<br>END</div>`;
   const t = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
   await t.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`<html><body style="margin:0">${body}</body></html>`));
   const r = await printContents(t.webContents, kind, kind === "label" ? prefs.labelSize || "50x25" : kind === "receipt" ? prefs.receiptWidth || "80" : "");
@@ -499,13 +516,7 @@ function createWindow() {
       if (state === "completed") shell.showItemInFolder(item.getSavePath());
     });
   });
-  win.loadURL(
-    "data:text/html;charset=utf-8," +
-      encodeURIComponent(
-        `<html><body style="margin:0;display:grid;place-items:center;height:100vh;font-family:Segoe UI,sans-serif;background:#f6f7f9;color:#475569">
-         <div style="text-align:center"><div style="font-size:22px;font-weight:600;color:#0f172a">${brand.productName}</div><div style="margin-top:8px">${ONLINE ? "Connecting…" : "Starting…"}</div></div></body></html>`,
-      ),
-  );
+  showScreen("connecting", ONLINE ? "Connecting to your shop…" : "Starting…");
 }
 
 // ---------- moving offline data online ----------
@@ -519,13 +530,17 @@ function hasOfflineData() {
 
 function dumpOfflineData(outFile) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(__dirname, "migrate-dump.cjs"), dataDir, outFile], {
-      cwd: __dirname,
+    // Inside the installed app this file sits in the app.asar archive, which can't be a working folder and
+    // can't be run from directly: use the unpacked copy (see asarUnpack) and the user-data folder.
+    const script = path.join(__dirname, "migrate-dump.cjs").replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+    const child = spawn(process.execPath, [script, dataDir, outFile], {
+      cwd: userData,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
     let out = "", err = "";
+    child.on("error", (e) => reject(new Error(`Could not start the reader: ${e.message}`)));
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
     child.on("exit", () => {
@@ -704,11 +719,10 @@ function writeJson(file, data) {
 }
 const readQueue = () => readJson(queueFile, { sales: [], seq: 0 });
 
-function offlinePage(msg) {
-  return "data:text/html;charset=utf-8," + encodeURIComponent(
-    `<html><body style="margin:0;display:grid;place-items:center;height:100vh;font-family:Segoe UI,sans-serif;background:#f6f7f9;color:#475569">
-     <div style="text-align:center;max-width:460px"><div style="font-size:22px;font-weight:600;color:#0f172a">${brand.productName}</div>
-     <div style="margin-top:10px">${msg}</div><div style="margin-top:6px;font-size:12px">Trying again automatically…</div></div></body></html>`);
+/** The branded full-window screen (desktop/screen.html): "connecting" or "offline". */
+function showScreen(state, msg = "", detail = "") {
+  if (!win) return;
+  win.loadFile(path.join(__dirname, "screen.html"), { query: { state, msg, detail, product: brand.productName, support: supportText() } }).catch(() => {});
 }
 
 async function netFetch(url, opts = {}, ms = 8000) {
@@ -801,7 +815,7 @@ function enterOffline(reason) {
     win.loadFile(OFFLINE_PAGE);
     win.setTitle(`${brand.productName} · OFFLINE`);
   } else {
-    win.loadURL(offlinePage("No internet connection. Check the shop Wi-Fi or cable.<br><br>The offline till becomes available after the first sign-in while online."));
+    showScreen("offline", "There's no internet connection right now. The offline till is ready after the first sign-in while online.", reason);
   }
   scheduleReconnect(10000);
 }
@@ -844,15 +858,23 @@ function openOnline() {
 }
 
 function watchConnection() {
-  win.webContents.on("did-fail-load", (_e, code, _desc, url, isMain) => {
+  let failures = 0;
+  win.webContents.on("did-fail-load", async (_e, code, desc, url, isMain) => {
     // -3 is "aborted" (a normal redirect); only react when the app itself can't load.
     if (!isMain || code === -3 || !String(url).startsWith(BASE)) return;
-    log(`online: load failed ${code} ${url}`);
-    enterOffline(`page failed to load (${code})`);
+    log(`online: load failed ${code} ${desc} ${url}`);
+    // A single hiccup (Wi-Fi switching, slow DNS): if the site answers, just load it again.
+    if (failures < 2 && (await isOnline())) {
+      failures++;
+      setTimeout(() => win.loadURL(url).catch(() => {}), 1500);
+      return;
+    }
+    failures = 0;
+    enterOffline(`${desc || "load failed"} (${code})`);
   });
   // A router, proxy or captive portal may answer with its own error page instead of failing.
   win.webContents.on("did-navigate", async (_e, url, code) => {
-    if (!String(url).startsWith(BASE) || !(code >= 500 || code === 0)) return;
+    if (!String(url).startsWith(BASE) || !(code >= 500)) return;
     if (!(await isOnline())) enterOffline(`server answered ${code}`);
   });
   // The website changes pages without full reloads (e.g. right after signing in), so watch both.
@@ -916,7 +938,7 @@ ipcMain.handle("sd:off-print", async (e, { html, width } = {}) => {
     t.destroy();
   }
 });
-ipcMain.handle("sd:off-retry", (e) => { if (fromOffline(e)) scheduleReconnect(0); });
+ipcMain.handle("sd:off-retry", (e) => { if (e.sender === (win && win.webContents) && e.sender.getURL().startsWith("file:")) scheduleReconnect(0); });
 ipcMain.handle("sd:off-remove", (e, id) => {
   if (!fromOffline(e)) return;
   const q = readQueue();
