@@ -6,6 +6,8 @@ export const VENDOR = {
   tagline: "Build · Automate · Grow",
   city: "Ras Al Khaimah, UAE",
   email: "dollar44.uae@gmail.com",
+  whatsapp: "+971 58 505 8085",
+  whatsappUrl: "https://wa.me/971585058085",
   instagram: "dollar44.uae",
   instagramUrl: "https://instagram.com/dollar44.uae",
 };

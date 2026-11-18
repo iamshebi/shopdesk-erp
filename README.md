@@ -3,24 +3,32 @@
 Billing, stock and repair ERP for shops in the UAE, by **DOLLAR44** (Ras Al Khaimah) · dollar44.uae@gmail.com · Instagram @dollar44.uae.
 One codebase. Each client gets their own copy (own database, their own shop name and logo inside); the software name stays DOLLAR44 ERP.
 
-## Subscriptions and activation keys
+## Activation keys (DOLLAR44 holds the authority)
 
-Clients pay monthly (or yearly) and get an **activation key** for that period.
+DOLLAR44 ERP is given only to paying clients. Two keys, both signed with DOLLAR44's private key
+(`dollar44-license-private.pem`, never in this repo); the app holds only the public key, so nobody else can make keys.
 
-* A new install runs a **14-day trial**. After a key ends there are **5 grace days** with a red warning, then the app locks
-  on the activation screen until a new key is entered. Data is never deleted; the owner can still download a backup.
-* Keys are signed with DOLLAR44's private key (Ed25519); the app holds only the public key, so a shop cannot make or edit one.
-  Turning the computer's clock back does not extend a key.
-* The owner enters the key at **Settings → Subscription** (`/activate`).
+**1. PC key: once per computer (desktop app).** On first start the app shows a Request Code (`REQ-XXXX-XXXX-XXXX`),
+tied to that computer. The client sends it to DOLLAR44 (WhatsApp +971 58 505 8085, dollar44.uae@gmail.com).
+DOLLAR44 sends back a `D44PC-…` key.
+* Key **without** a website: the app runs offline with its own database on that PC.
+* Key **with** the client's website (`D44PC-…@erp.clientshop.ae`): the app opens the client's own online ERP, so they
+  can also use it from any browser. Help → *Enter a new activation key…* switches a PC to a website later.
 
-**Issue a key** (DOLLAR44 only):
-* On GitHub: *Actions → Issue activation key → Run workflow* (client name, months, optional start date). The key is in the run summary.
-  One-time setup: add the repository secret `D44_LICENSE_PRIVATE_KEY` with the contents of `dollar44-license-private.pem`.
-* Or on a computer that holds the private key: `node scripts/license.mjs --client "Kenz Mobile Phones" --months 1`
-  (renewal: add `--start` with the day after the old key ends).
+**2. Subscription key: each paid period.** A new install runs a 14-day trial. Keys (`D44-…`) cover 1, 3, 6 or 12 months;
+after the end there are 5 grace days with a red warning, then the app locks on the renewal screen (data is kept and the
+owner can still download a backup). The owner pastes the key at **Settings → Subscription**. Turning the clock back
+does not extend a key. Staff log in with their own username and password as usual.
 
-Keep `dollar44-license-private.pem` safe and private. If it leaks, anyone could make keys; if it is lost, a new pair must be
-made and the public key in `src/lib/license.ts` replaced in every client's next update.
+**Making keys**
+* Phone or PC, offline: open `scripts/license-keygen.html` in Chrome, paste the private key once, then make PC keys
+  (request code + optional website) and subscription keys (shop name + months).
+* Command line: `SHOPDESK_LICENSE_KEY_FILE=dollar44-license-private.pem node scripts/license-keygen.mjs REQ-… [erp.clientshop.ae]`
+  and `node scripts/license.mjs --client "Shop" --months 1`.
+* GitHub: *Actions → Issue activation key* (needs the repository secret `D44_LICENSE_PRIVATE_KEY`).
+
+**A client's online ERP:** deploy this repo as a new Vercel project for that client with its own Postgres database
+(`DATABASE_URL`, `SESSION_SECRET`), attach their domain, then give their PCs a key with that domain.
 
 ## What's inside
 

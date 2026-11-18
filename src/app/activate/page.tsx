@@ -72,8 +72,9 @@ export default async function ActivatePage({ searchParams }: { searchParams: Pro
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/dollar44-logo.png" alt="DOLLAR44" className="h-16 w-auto shrink-0 rounded-lg" />
           <div className="text-sm">
-            <div className="font-semibold">Get or renew your key</div>
+            <div className="font-semibold">No key yet, or need to renew? Contact us</div>
             <div className="text-slate-500">{VENDOR.name} · {VENDOR.city}</div>
+            <a className="block text-accent underline" href={`${VENDOR.whatsappUrl}?text=${subject}`} target="_blank" rel="noreferrer">WhatsApp {VENDOR.whatsapp}</a>
             <a className="block text-accent underline" href={`mailto:${VENDOR.email}?subject=${subject}`}>{VENDOR.email}</a>
             <a className="block text-accent underline" href={VENDOR.instagramUrl} target="_blank" rel="noreferrer">Instagram @{VENDOR.instagram}</a>
           </div>

@@ -73,7 +73,12 @@ function run(cmd, args) {
  * formatting and reinstalling Windows (shops do this often); the Windows MachineGuid is the fallback
  * for boards that report a junk UUID.
  */
+let cachedMachineId = "";
 function getMachineId() {
+  if (!cachedMachineId) cachedMachineId = readMachineId();
+  return cachedMachineId;
+}
+function readMachineId() {
   if (process.platform === "win32") {
     const uuid = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(Get-CimInstance -ClassName Win32_ComputerSystemProduct).UUID"]);
     if (!isJunkId(uuid)) return "BOARD:" + uuid.toUpperCase();
@@ -107,27 +112,53 @@ function normaliseRequest(code) {
   return `REQ-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`;
 }
 
+/**
+ * The client's own website, written into the key by DOLLAR44. With a site the app opens that site (online mode);
+ * without one it runs its own database on the PC (offline mode). Returns "" for no site.
+ */
+function normaliseSite(site) {
+  const s = String(site || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!s) return "";
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d+)?$/.test(s)) throw new Error("A website looks like erp.yourshop.ae");
+  return s;
+}
+/** "D44PC-…@erp.shop.ae" -> { code: "D44PC-…", site: "erp.shop.ae" } */
+function splitKey(text) {
+  const t = String(text || "").trim().replace(/\s+/g, "");
+  const at = t.indexOf("@");
+  return at < 0 ? { code: t.toUpperCase(), site: "" } : { code: t.slice(0, at).toUpperCase(), site: t.slice(at + 1) };
+}
+function message(requestCode, site) {
+  const req = normaliseRequest(requestCode);
+  return Buffer.from(site ? `${req}|${site}` : req);
+}
+/** The website a key was made for ("" = offline). */
+function keySite(activationKey) {
+  try { return normaliseSite(splitKey(activationKey).site); } catch { return ""; }
+}
+
 function formatKey(sig) {
   const body = b32encode(sig);
   return `${KEY_PREFIX}-` + body.match(/.{1,6}/g).join("-");
 }
 
 /** Seller side: signs a request code with the private key (PKCS8 PEM or base64 DER). */
-function generateActivationKey(requestCode, privateKey) {
+function generateActivationKey(requestCode, privateKey, site = "") {
   const key = privateKey.includes("BEGIN") ? crypto.createPrivateKey(privateKey) : crypto.createPrivateKey({ key: Buffer.from(privateKey.trim(), "base64"), format: "der", type: "pkcs8" });
-  const sig = crypto.sign(null, Buffer.from(normaliseRequest(requestCode)), key);
-  return formatKey(sig);
+  const s = normaliseSite(site);
+  const sig = crypto.sign(null, message(requestCode, s), key);
+  return formatKey(sig) + (s ? `@${s}` : "");
 }
 
 /** App side: true when the key was made for this exact request code. */
 function verifyActivationKey(requestCode, activationKey, publicKeyB64 = PUBLIC_KEY_B64) {
   try {
-    const text = String(activationKey || "").trim().toUpperCase();
-    if (!text.startsWith(KEY_PREFIX)) return false;
-    const sig = b32decode(text.slice(KEY_PREFIX.length));
+    const { code, site } = splitKey(activationKey);
+    if (!code.startsWith(KEY_PREFIX)) return false;
+    const sig = b32decode(code.slice(KEY_PREFIX.length));
     if (sig.length !== 64) return false;
     const pub = crypto.createPublicKey({ key: Buffer.from(publicKeyB64, "base64"), format: "der", type: "spki" });
-    return crypto.verify(null, Buffer.from(normaliseRequest(requestCode)), pub, sig);
+    return crypto.verify(null, message(requestCode, normaliseSite(site)), pub, sig);
   } catch {
     return false;
   }
@@ -140,11 +171,13 @@ function checkLicense(file, appId) {
   try {
     saved = JSON.parse(fs.readFileSync(file, "utf8")).key || "";
   } catch {}
-  return { requestCode, valid: !!saved && verifyActivationKey(requestCode, saved) };
+  const valid = !!saved && verifyActivationKey(requestCode, saved);
+  return { requestCode, valid, site: valid ? keySite(saved) : "" };
 }
 
 function saveLicense(file, key) {
-  fs.writeFileSync(file, JSON.stringify({ key: key.trim().toUpperCase(), activatedAt: new Date().toISOString() }, null, 2));
+  const { code, site } = splitKey(key);
+  fs.writeFileSync(file, JSON.stringify({ key: code + (site ? `@${normaliseSite(site)}` : ""), activatedAt: new Date().toISOString() }, null, 2));
 }
 
-module.exports = { getMachineId, getRequestCode, generateActivationKey, verifyActivationKey, checkLicense, saveLicense, normaliseRequest, isJunkId };
+module.exports = { getMachineId, getRequestCode, generateActivationKey, verifyActivationKey, checkLicense, saveLicense, normaliseRequest, normaliseSite, keySite, isJunkId };

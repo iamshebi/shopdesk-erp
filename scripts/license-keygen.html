@@ -28,7 +28,7 @@
 <body>
 <main>
   <h1>DOLLAR44 ERP · PC activation keys</h1>
-  <p class="sub">Works offline. Paste a shop's Request Code to get its Activation Key. Keep this page and your private key to yourself.</p>
+  <p class="sub">Works offline. Makes the two keys a paying client needs: a PC key for each computer, and a subscription key for each paid month. Keep this page and your private key to yourself.</p>
 
   <section class="card" id="setup">
     <label for="priv">1 · Your private key (one time)</label>
@@ -38,8 +38,10 @@
   </section>
 
   <section class="card">
-    <label for="req">2 · Shop's Request Code</label>
+    <label for="req">2 · PC key: the shop's Request Code</label>
     <input id="req" placeholder="REQ-1A2B-3C4D-5E6F" autocomplete="off" autocapitalize="characters" />
+    <label for="site" style="margin-top:12px">Client's website (optional)</label>
+    <input id="site" placeholder="erp.clientshop.ae · leave empty to run offline on the PC" autocomplete="off" autocapitalize="none" />
     <div class="row"><button id="make">Make Activation Key</button><button class="ghost" id="forget">Forget private key</button></div>
     <div id="msg"></div>
     <div id="result" class="hidden">
@@ -48,6 +50,21 @@
     </div>
   </section>
   <p><small>Needs Chrome 137 or newer (or a recent Samsung Internet / Safari / Edge).</small></p>
+  <section class="card">
+    <label for="subClient">3 · Subscription key: client's shop name</label>
+    <input id="subClient" placeholder="Kenz Mobile Phones" autocomplete="off" />
+    <div class="row">
+      <select id="subMonths"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select>
+      <input id="subStart" type="date" aria-label="Start date" />
+    </div>
+    <div class="row"><button id="subMake">Make subscription key</button></div>
+    <div id="subMsg"></div>
+    <div id="subResult" class="hidden">
+      <div class="sub" id="subInfo"></div>
+      <div class="out" id="subKey"></div>
+      <div class="row"><button id="subCopy">Copy key</button><button class="ghost" id="subWa">Send on WhatsApp</button></div>
+    </div>
+  </section>
 </main>
 <script>
 const PUBLIC_KEY_B64 = "MCowBQYDK2VwAyEAK13MMsYEXHZOgJ36ycK/RzKkz60X3DT5FG9V5kjJlds=";
@@ -66,6 +83,12 @@ function normaliseRequest(code) {
   const hex = String(code || "").toUpperCase().replace(/^REQ/, "").replace(/[^0-9A-F]/g, "");
   if (hex.length !== 12) throw new Error("A request code looks like REQ-1A2B-3C4D-5E6F");
   return `REQ-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`;
+}
+function normaliseSite(site) {
+  const s = String(site || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!s) return "";
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d+)?$/.test(s)) throw new Error("A website looks like erp.clientshop.ae");
+  return s;
 }
 function getPriv() { try { return localStorage.getItem(STORE) || ""; } catch { return ""; } }
 function showSetup() {
@@ -103,8 +126,10 @@ $("make").onclick = async () => {
     const req = normaliseRequest($("req").value);
     $("req").value = req;
     const priv = await checkPair(privB64);
-    const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(req)));
-    const key = "D44PC-" + b32encode(sig).match(/.{1,6}/g).join("-");
+    const site = normaliseSite($("site").value);
+    $("site").value = site;
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(site ? `${req}|${site}` : req)));
+    const key = "D44PC-" + b32encode(sig).match(/.{1,6}/g).join("-") + (site ? "@" + site : "");
     $("key").textContent = key;
     $("result").classList.remove("hidden");
   } catch (e) {
@@ -114,6 +139,39 @@ $("make").onclick = async () => {
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("key").textContent); $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy key"), 1500); } catch {} };
 $("wa").onclick = () => {
   const t = `Your DOLLAR44 ERP activation key for this computer:\n\n${$("key").textContent}\n\nPaste it in the activation screen and press Activate.`;
+  location.href = "https://wa.me/?text=" + encodeURIComponent(t);
+};
+function b64url(bytes) { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function uaeToday() { return new Date(Date.now() + 4 * 3600e3).toISOString().slice(0, 10); }
+$("subStart").value = uaeToday();
+$("subMake").onclick = async () => {
+  $("subMsg").innerHTML = ""; $("subResult").classList.add("hidden");
+  try {
+    const privB64 = getPriv();
+    if (!privB64) throw new Error("Save your private key first (step 1).");
+    const client = $("subClient").value.trim();
+    if (!client) throw new Error("Type the client's shop name.");
+    const months = Number($("subMonths").value);
+    const start = $("subStart").value || uaeToday();
+    const end = new Date(start + "T00:00:00Z");
+    end.setUTCMonth(end.getUTCMonth() + months);
+    end.setUTCDate(end.getUTCDate() - 1);
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    const plan = months === 12 ? "Yearly" : months === 1 ? "Monthly" : `${months} months`;
+    const payload = { v: 1, id, c: client, p: plan, s: start, e: end.toISOString().slice(0, 10) };
+    const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
+    const priv = await checkPair(privB64);
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(body)));
+    $("subKey").textContent = `D44-${body}.${b64url(sig)}`;
+    $("subInfo").textContent = `${client} · ${plan} · ${payload.s} to ${payload.e} · ID ${id}`;
+    $("subResult").classList.remove("hidden");
+  } catch (e) {
+    $("subMsg").innerHTML = `<div class="err">${e.message || e}</div>`;
+  }
+};
+$("subCopy").onclick = async () => { try { await navigator.clipboard.writeText($("subKey").textContent); $("subCopy").textContent = "Copied"; setTimeout(() => ($("subCopy").textContent = "Copy key"), 1500); } catch {} };
+$("subWa").onclick = () => {
+  const t = `Your DOLLAR44 ERP subscription key (${$("subInfo").textContent}):\n\n${$("subKey").textContent}\n\nOpen Settings → Subscription, paste it and press Activate.`;
   location.href = "https://wa.me/?text=" + encodeURIComponent(t);
 };
 showSetup();

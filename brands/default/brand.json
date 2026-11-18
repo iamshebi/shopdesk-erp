@@ -5,9 +5,11 @@
   "port": 4300,
   "supportName": "DOLLAR44 · Ras Al Khaimah",
   "supportEmail": "dollar44.uae@gmail.com",
-  "supportPhone": "",
+  "supportPhone": "+971 58 505 8085",
   "supportWebsite": "https://instagram.com/dollar44.uae",
-  "legacyDataFolders": ["ShopDesk"],
+  "legacyDataFolders": [
+    "ShopDesk"
+  ],
   "license": true,
   "mode": "offline",
   "url": ""

@@ -1,5 +1,6 @@
 // Seller tool: turns a shop's Request Code into its Activation Key.
-//   node scripts/license-keygen.mjs REQ-1A2B-3C4D-5E6F
+//   node scripts/license-keygen.mjs REQ-1A2B-3C4D-5E6F                      -> offline, own database on that PC
+//   node scripts/license-keygen.mjs REQ-1A2B-3C4D-5E6F erp.clientshop.ae    -> that PC opens the client's website
 // The private key is read from SHOPDESK_LICENSE_KEY (base64) or from the file in SHOPDESK_LICENSE_KEY_FILE.
 // Never commit the private key. On a phone, use license-keygen.html instead.
 import fs from "node:fs";
@@ -19,9 +20,10 @@ if (!priv) {
   process.exit(1);
 }
 const req = normaliseRequest(code);
-const key = generateActivationKey(req, priv);
+const site = process.argv[3] || "";
+const key = generateActivationKey(req, priv, site);
 if (!verifyActivationKey(req, key)) {
   console.error("This private key does not match the public key built into the app.");
   process.exit(1);
 }
-console.log(`Request code:   ${req}\nActivation key: ${key}`);
+console.log(`Request code:   ${req}\nWebsite:        ${site || "(none, offline)"}\nActivation key: ${key}`);

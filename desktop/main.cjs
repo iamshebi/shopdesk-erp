@@ -12,10 +12,6 @@ const license = require("./license.cjs");
 
 const brand = JSON.parse(fs.readFileSync(path.join(__dirname, "brand.json"), "utf8"));
 const PORT = Number(brand.port || 4300);
-// Online mode: the app opens the shop's live website (cloud database), so the owner sees the same data,
-// reports and logs from any browser. Offline mode: runs its own server and database on this PC.
-const ONLINE = brand.mode === "online" && /^https?:\/\//.test(String(brand.url || ""));
-const BASE = ONLINE ? new URL(brand.url).origin : `http://127.0.0.1:${PORT}`;
 const PRELOAD = path.join(__dirname, "preload.cjs");
 const LICENSE_ON = brand.license !== false;
 
@@ -47,6 +43,14 @@ const dataDir = path.join(userData, "data");
 const backupDir = path.join(app.getPath("documents"), `${brand.productName} Backups`);
 const logFile = path.join(userData, "server.log");
 const licenseFile = path.join(userData, "license.json");
+
+// Online mode: the app opens the shop's live website (cloud database), so the owner sees the same data,
+// reports and logs from any browser. Offline mode: runs its own server and database on this PC.
+// The client's website comes from their DOLLAR44 activation key (…@erp.theirshop.ae); a brand.json url is the fallback.
+const STARTUP_LICENSE = LICENSE_ON ? license.checkLicense(licenseFile, brand.appId) : { valid: false, site: "" };
+const SITE_URL = STARTUP_LICENSE.site ? `https://${STARTUP_LICENSE.site}` : brand.mode === "online" ? String(brand.url || "") : "";
+const ONLINE = /^https?:\/\//.test(SITE_URL);
+const BASE = ONLINE ? new URL(SITE_URL).origin : `http://127.0.0.1:${PORT}`;
 const prefsFile = path.join(userData, "desktop-prefs.json");
 let server = null;
 let win = null;
@@ -196,11 +200,35 @@ function requireActivation() {
     w.on("closed", () => {
       if (!done) {
         cleanup();
+        // Changing the key was cancelled: keep the key that worked before.
+        restorePreviousKey();
         resolve(false);
       }
     });
     w.loadFile(path.join(__dirname, "activate.html"));
   });
+}
+
+const previousKeyFile = path.join(userData, "license.previous.json");
+function restorePreviousKey() {
+  try {
+    if (fs.existsSync(previousKeyFile) && !license.checkLicense(licenseFile, brand.appId).valid) fs.renameSync(previousKeyFile, licenseFile);
+  } catch {}
+}
+
+/** Help → Enter a new activation key: e.g. DOLLAR44 sends a key that connects this PC to the client's website. */
+async function changeActivationKey() {
+  const r = await dialog.showMessageBox(win, {
+    type: "question",
+    buttons: ["Enter new key", "Cancel"],
+    cancelId: 1,
+    message: "Enter a new activation key?",
+    detail: "Use this when DOLLAR44 sends you a new key, for example to connect this computer to your own website. The app restarts. If you cancel on the next screen, the current key stays.",
+  });
+  if (r.response !== 0) return;
+  try { fs.renameSync(licenseFile, previousKeyFile); } catch {}
+  app.relaunch();
+  app.quit();
 }
 
 // ---------- backups ----------
@@ -453,10 +481,12 @@ function buildMenu() {
                 brand.supportPhone,
                 brand.supportWebsite,
                 LICENSE_ON && `\nLicence: activated on this computer (${license.getRequestCode(brand.appId)})`,
+                LICENSE_ON && `Licensed by DOLLAR44 · ${ONLINE ? `connected to ${BASE.replace(/^https?:\/\//, "")}` : "offline, data on this computer"}`,
                 ONLINE ? `\nOnline: ${BASE}` : `\nData folder: ${dataDir}`,
               ].filter(Boolean).join("\n"),
             }),
         },
+        ...(LICENSE_ON ? [{ label: "Enter a new activation key…", click: () => changeActivationKey() }] : []),
         { label: "Show data folder", click: () => shell.openPath(dataDir) },
         { label: "Show engine log", click: () => shell.openPath(logFile) },
       ],
@@ -551,9 +581,22 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   if (LICENSE_ON && !(await requireActivation())) {
-    app.exit(0);
-    return;
+    // A cancelled key change still leaves a working key: start normally with it.
+    if (!license.checkLicense(licenseFile, brand.appId).valid) {
+      app.exit(0);
+      return;
+    }
   }
+  // A new key that points to a different website (or none) takes effect after a restart.
+  if (LICENSE_ON) {
+    const now = license.checkLicense(licenseFile, brand.appId);
+    if (now.valid && now.site !== STARTUP_LICENSE.site) {
+      app.relaunch();
+      app.exit(0);
+      return;
+    }
+  }
+  try { fs.rmSync(previousKeyFile, { force: true }); } catch {}
   buildMenu();
   createWindow();
   if (ONLINE) {
