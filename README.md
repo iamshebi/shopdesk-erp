@@ -15,7 +15,7 @@ DOLLAR44 sends back a `D44PC-…` key.
 * Key **with** the client's website (`D44PC-…@erp.clientshop.ae`): the app opens the client's own online ERP, so they
   can also use it from any browser. Help → *Enter a new activation key…* switches a PC to a website later.
 
-**2. Subscription key: each paid period.** A new install runs a 14-day trial. Keys (`D44-…`) cover 1, 3, 6 or 12 months;
+**2. Subscription key: each paid period.** A new install runs a 14-day trial. Keys (`D44-…`) cover 1 year by default, or any length you choose (days, months or years);
 after the end there are 5 grace days with a red warning, then the app locks on the renewal screen (data is kept and the
 owner can still download a backup). The owner pastes the key at **Settings → Subscription**. Turning the clock back
 does not extend a key. Staff log in with their own username and password as usual.

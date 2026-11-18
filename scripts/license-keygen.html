@@ -54,8 +54,14 @@
     <label for="subClient">3 · Subscription key: client's shop name</label>
     <input id="subClient" placeholder="Kenz Mobile Phones" autocomplete="off" />
     <div class="row">
-      <select id="subMonths"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select>
+      <select id="subLen" aria-label="How long">
+        <option value="12m" selected>1 year</option><option value="24m">2 years</option><option value="6m">6 months</option><option value="3m">3 months</option><option value="1m">1 month</option><option value="custom">Custom…</option>
+      </select>
       <input id="subStart" type="date" aria-label="Start date" />
+    </div>
+    <div class="row" id="subCustom" hidden>
+      <input id="subNum" type="number" min="1" max="3650" value="45" aria-label="Number" style="max-width:110px" />
+      <select id="subUnit" aria-label="Unit"><option value="d">days</option><option value="m">months</option><option value="y">years</option></select>
     </div>
     <div class="row"><button id="subMake">Make subscription key</button></div>
     <div id="subMsg"></div>
@@ -144,6 +150,7 @@ $("wa").onclick = () => {
 function b64url(bytes) { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 function uaeToday() { return new Date(Date.now() + 4 * 3600e3).toISOString().slice(0, 10); }
 $("subStart").value = uaeToday();
+$("subLen").onchange = () => { $("subCustom").hidden = $("subLen").value !== "custom"; };
 $("subMake").onclick = async () => {
   $("subMsg").innerHTML = ""; $("subResult").classList.add("hidden");
   try {
@@ -151,13 +158,19 @@ $("subMake").onclick = async () => {
     if (!privB64) throw new Error("Save your private key first (step 1).");
     const client = $("subClient").value.trim();
     if (!client) throw new Error("Type the client's shop name.");
-    const months = Number($("subMonths").value);
+    let n, unit;
+    if ($("subLen").value === "custom") { n = Math.floor(Number($("subNum").value)); unit = $("subUnit").value; }
+    else { n = parseInt($("subLen").value, 10); unit = "m"; }
+    if (!(n >= 1) || (unit === "d" && n > 3650) || (unit === "m" && n > 120) || (unit === "y" && n > 10)) throw new Error("Choose a length between 1 day and 10 years.");
     const start = $("subStart").value || uaeToday();
     const end = new Date(start + "T00:00:00Z");
-    end.setUTCMonth(end.getUTCMonth() + months);
+    if (unit === "d") end.setUTCDate(end.getUTCDate() + n);
+    if (unit === "m") end.setUTCMonth(end.getUTCMonth() + n);
+    if (unit === "y") end.setUTCFullYear(end.getUTCFullYear() + n);
     end.setUTCDate(end.getUTCDate() - 1);
+    const months = unit === "y" ? n * 12 : unit === "m" ? n : 0;
     const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-    const plan = months === 12 ? "Yearly" : months === 1 ? "Monthly" : `${months} months`;
+    const plan = unit === "d" ? `${n} day${n === 1 ? "" : "s"}` : months === 12 ? "Yearly" : months === 1 ? "Monthly" : months % 12 === 0 ? `${months / 12} years` : `${months} months`;
     const payload = { v: 1, id, c: client, p: plan, s: start, e: end.toISOString().slice(0, 10) };
     const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
     const priv = await checkPair(privB64);

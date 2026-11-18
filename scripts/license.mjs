@@ -1,7 +1,9 @@
 // Issues DOLLAR44 ERP activation keys. Only DOLLAR44 runs this: it needs the private key, which never
 // goes into this repo or onto a client's computer.
 //
+//   node scripts/license.mjs --client "Kenz Mobile Phones"                 (1 year, the default)
 //   node scripts/license.mjs --client "Kenz Mobile Phones" --months 1
+//   node scripts/license.mjs --client "Kenz Mobile Phones" --years 2
 //   node scripts/license.mjs --client "Kenz Mobile Phones" --months 12 --plan Yearly --start 2026-12-01
 //   node scripts/license.mjs --client "Demo" --days 7 --plan Demo
 //
@@ -23,13 +25,12 @@ const today = new Date(Date.now() + 4 * 3600_000).toISOString().slice(0, 10); //
 const start = opt("start", today);
 if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) throw new Error("--start must be YYYY-MM-DD");
 const end = new Date(`${start}T00:00:00Z`);
-const months = Number(opt("months", 0));
 const days = Number(opt("days", 0));
-if (!months && !days) throw new Error("Give --months or --days");
+const months = Number(opt("months", 0)) + 12 * Number(opt("years", 0)) || (days ? 0 : 12); // default: 1 year
 if (months) end.setUTCMonth(end.getUTCMonth() + months);
 if (days) end.setUTCDate(end.getUTCDate() + days);
 end.setUTCDate(end.getUTCDate() - 1);
-const plan = opt("plan", months === 12 ? "Yearly" : months ? (months === 1 ? "Monthly" : `${months} months`) : `${days} days`);
+const plan = opt("plan", months === 12 ? "Yearly" : months % 12 === 0 && months ? `${months / 12} years` : months ? (months === 1 ? "Monthly" : `${months} months`) : `${days} days`);
 
 const payload = { v: 1, id: crypto.randomBytes(4).toString("hex").toUpperCase(), c: client, p: plan, s: start, e: end.toISOString().slice(0, 10) };
 const body = Buffer.from(JSON.stringify(payload)).toString("base64url");

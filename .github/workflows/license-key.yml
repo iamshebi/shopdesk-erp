@@ -9,9 +9,9 @@ on:
         description: "Client / shop name"
         required: true
       months:
-        description: "Months (1 = monthly, 12 = yearly)"
+        description: "Months (12 = 1 year, the default; 1 = monthly; 24 = 2 years)"
         required: true
-        default: "1"
+        default: "12"
       start:
         description: "Start date YYYY-MM-DD (empty = today)"
         required: false
