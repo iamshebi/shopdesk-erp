@@ -20,6 +20,21 @@ after the end there are 5 grace days with a red warning, then the app locks on t
 owner can still download a backup). The owner pastes the key at **Settings → Subscription**. Turning the clock back
 does not extend a key. Staff log in with their own username and password as usual.
 
+**Plans (inside the subscription key).** Basic: POS, VAT invoices, stock, purchases, repairs, buy-used, expenses,
+cash shifts, cheques and reports, 3 staff logins. Pro: Basic plus accounting, HR and payroll, CRM, orders and quotes,
+marketing, shipping, website and approvals, 10 staff logins. Enterprise: everything plus API keys, webhooks and
+automation, no login limit. A key can set its own staff limit. Modules outside the plan disappear for everyone.
+
+**Cancelling keys and pushing updates.** DOLLAR44 publishes a signed `status.json` at https://d44-licence.vercel.app/status.json
+(Vercel project `d44-licence`). It lists cancelled subscription licence IDs and cancelled PC request codes, and the
+latest Windows app (version, download link, SHA-512). The app and the Windows shell read it twice a day:
+* a cancelled subscription locks the app at the renewal screen; a cancelled PC returns to the activation screen;
+* a newer app version is downloaded in the background, checked against the SHA-512, and installed when the user agrees
+  or when they close the app (Help → Check for updates does it now);
+* a paid copy that cannot reach the status file for 60 days locks until it goes online once (warning from 45 days).
+Make the file in the key maker (section 4) or with `node scripts/status.mjs status-config.json > status.json`.
+The app never accepts a status file older than the one it already has, so to restore a client publish a new file.
+
 **Making keys**
 * Phone or PC, offline: open `scripts/license-keygen.html` in Chrome, paste the private key once, then make PC keys
   (request code + optional website) and subscription keys (shop name + months).

@@ -231,6 +231,99 @@ async function changeActivationKey() {
   app.quit();
 }
 
+// ---------- DOLLAR44 status: cancelled keys and updates ----------
+const STATUS_URL = brand.statusUrl || "https://d44-licence.vercel.app/status.json";
+const statusFile = path.join(userData, "dollar44-status.json");
+const updatesDir = path.join(userData, "updates");
+let pendingInstaller = "";
+
+async function fetchStatus() {
+  const { net } = require("electron");
+  const res = await net.fetch(STATUS_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  const d = license.verifyStatus(text);
+  if (!d) throw new Error("status file signature is not DOLLAR44's");
+  let prev = null;
+  try { prev = license.verifyStatus(fs.readFileSync(statusFile, "utf8")); } catch {}
+  if (prev && Date.parse(prev.t) > Date.parse(d.t)) return prev; // never go back to an older file
+  fs.writeFileSync(statusFile, text);
+  return d;
+}
+
+async function downloadUpdate(info) {
+  fs.mkdirSync(updatesDir, { recursive: true });
+  const file = path.join(updatesDir, `${brand.executableName}-Setup-${info.version}.exe`);
+  const want = String(info.sha512 || "").toLowerCase();
+  const hashOf = (f) => crypto.createHash("sha512").update(fs.readFileSync(f)).digest("hex");
+  if (fs.existsSync(file) && hashOf(file) === want) return file;
+  const { net } = require("electron");
+  const res = await net.fetch(info.url);
+  if (!res.ok) throw new Error(`download HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const got = crypto.createHash("sha512").update(buf).digest("hex");
+  if (!want || got !== want) throw new Error("downloaded update does not match DOLLAR44's checksum");
+  fs.writeFileSync(file, buf);
+  for (const f of fs.readdirSync(updatesDir)) if (path.join(updatesDir, f) !== file) fs.rmSync(path.join(updatesDir, f), { force: true });
+  return file;
+}
+
+function runInstaller(file, restart) {
+  // NSIS: /S = silent; --force-run starts the app again when the update is in place.
+  // Waits a few seconds so this app and its engine have fully closed before the installer replaces the files.
+  const args = restart ? "/S --force-run" : "/S";
+  spawn("cmd.exe", ["/c", `timeout /t 6 /nobreak >nul & start "" "${file}" ${args}`], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+
+async function checkDollar44(manual) {
+  let d;
+  try {
+    d = await fetchStatus();
+  } catch (e) {
+    log(`status: ${e && e.message ? e.message : e}`);
+    if (manual) dialog.showMessageBox(win, { message: "Could not reach DOLLAR44", detail: "Check the internet connection and try again." });
+    return;
+  }
+  // A cancelled PC key: back to the activation screen.
+  if (LICENSE_ON && (d.revokedPcs || []).includes(license.getRequestCode(brand.appId))) {
+    try { fs.rmSync(licenseFile, { force: true }); } catch {}
+    await dialog.showMessageBox(win, {
+      type: "warning",
+      message: "This computer's activation was cancelled by DOLLAR44",
+      detail: `Your data is safe. Contact DOLLAR44 for a new key.\n${[brand.supportPhone, brand.supportEmail].filter(Boolean).join(" · ")}`,
+    });
+    app.relaunch();
+    app.quit();
+    return;
+  }
+  const info = d.app;
+  if (!info || !info.url || license.compareVersions(info.version, app.getVersion()) <= 0) {
+    if (manual) dialog.showMessageBox(win, { message: `${brand.productName} is up to date`, detail: `Version ${app.getVersion()}` });
+    return;
+  }
+  try {
+    const file = await downloadUpdate(info);
+    pendingInstaller = file;
+    log(`update ${info.version} downloaded`);
+    const r = await dialog.showMessageBox(win, {
+      type: "info",
+      buttons: ["Restart and update now", "Later (update when I close the app)"],
+      cancelId: 1,
+      message: `${brand.productName} ${info.version} is ready`,
+      detail: [info.notes, "Your data stays as it is. A backup is taken before the update."].filter(Boolean).join("\n\n"),
+    });
+    if (r.response === 0) {
+      pendingInstaller = "";
+      await backupNow(false);
+      runInstaller(file, true);
+      app.quit();
+    }
+  } catch (e) {
+    log(`update: ${e && e.message ? e.message : e}`);
+    if (manual) dialog.showErrorBox("Update failed", String(e && e.message ? e.message : e));
+  }
+}
+
 // ---------- backups ----------
 // Online: downloads the backup with the signed-in user's session (needs the "data" permission, e.g. the owner).
 async function fetchOnlineBackup() {
@@ -486,6 +579,7 @@ function buildMenu() {
               ].filter(Boolean).join("\n"),
             }),
         },
+        { label: "Check for updates", click: () => checkDollar44(true) },
         ...(LICENSE_ON ? [{ label: "Enter a new activation key…", click: () => changeActivationKey() }] : []),
         { label: "Show data folder", click: () => shell.openPath(dataDir) },
         { label: "Show engine log", click: () => shell.openPath(logFile) },
@@ -597,6 +691,9 @@ app.whenReady().then(async () => {
     }
   }
   try { fs.rmSync(previousKeyFile, { force: true }); } catch {}
+  // Ask DOLLAR44 for cancelled keys and updates shortly after start, then twice a day.
+  setTimeout(() => checkDollar44(false), 45 * 1000);
+  setInterval(() => checkDollar44(false), 12 * 60 * 60 * 1000);
   buildMenu();
   createWindow();
   if (ONLINE) {
@@ -628,7 +725,7 @@ app.on("before-quit", async (e) => {
   if (ONLINE) {
     e.preventDefault();
     quitting = true;
-    try { await Promise.race([backupNow(false), new Promise((r) => setTimeout(r, 15000))]); } finally { app.exit(0); }
+    try { await Promise.race([backupNow(false), new Promise((r) => setTimeout(r, 15000))]); } finally { if (pendingInstaller) runInstaller(pendingInstaller, false); app.exit(0); }
     return;
   }
   if (!server) return;
@@ -649,6 +746,7 @@ app.on("before-quit", async (e) => {
     await new Promise((r) => setTimeout(r, 800));
   } finally {
     if (server && server.exitCode === null) server.kill();
+    if (pendingInstaller) runInstaller(pendingInstaller, false);
     app.exit(0);
   }
 });

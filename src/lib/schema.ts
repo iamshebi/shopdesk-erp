@@ -1049,4 +1049,46 @@ export const MIGRATIONS: string[] = [
    UPDATE sale_items SET description = substr(description, 9) WHERE description LIKE 'Zaitoon %';
    UPDATE settings SET value = 'My Shop' WHERE key IN ('shop_name', 'legal_name') AND value ILIKE '%zaitoon%';
    UPDATE settings SET value = '' WHERE key = 'shop_name_ar' AND value LIKE '%زيتون%';`,
+
+  // 15. DOLLAR44: cash shifts per cashier, and the post-dated cheque register
+  `CREATE TABLE IF NOT EXISTS cash_shifts (
+     id SERIAL PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     counter TEXT NOT NULL DEFAULT '',
+     opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     opening_float NUMERIC(12,2) NOT NULL DEFAULT 0,
+     closed_at TIMESTAMPTZ,
+     expected_cash NUMERIC(12,2),
+     counted_cash NUMERIC(12,2),
+     notes TEXT NOT NULL DEFAULT '',
+     closed_by INTEGER REFERENCES users(id)
+   );
+   CREATE UNIQUE INDEX IF NOT EXISTS cash_shifts_one_open ON cash_shifts (user_id) WHERE closed_at IS NULL;
+   CREATE TABLE IF NOT EXISTS cash_moves (
+     id SERIAL PRIMARY KEY,
+     shift_id INTEGER NOT NULL REFERENCES cash_shifts(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL,
+     amount NUMERIC(12,2) NOT NULL,
+     reason TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id),
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE TABLE IF NOT EXISTS cheques (
+     id SERIAL PRIMARY KEY,
+     direction TEXT NOT NULL,
+     number TEXT NOT NULL,
+     bank TEXT NOT NULL DEFAULT '',
+     party TEXT NOT NULL,
+     customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+     supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+     amount NUMERIC(12,2) NOT NULL,
+     due_date DATE NOT NULL,
+     status TEXT NOT NULL DEFAULT 'pending',
+     reference TEXT NOT NULL DEFAULT '',
+     notes TEXT NOT NULL DEFAULT '',
+     created_by INTEGER REFERENCES users(id),
+     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+   CREATE INDEX IF NOT EXISTS cheques_due_idx ON cheques (due_date) WHERE status IN ('pending','deposited');`,
 ];

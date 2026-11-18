@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser, can } from "@/lib/auth";
-import { activate, getLicenseStatus } from "@/lib/license";
+import { activate, getLicenseStatus, checkNow } from "@/lib/license";
 import { log } from "@/lib/activity";
 
 export async function activateKey(fd: FormData) {
@@ -19,4 +19,11 @@ export async function activateKey(fd: FormData) {
   }
   revalidatePath("/", "layout");
   redirect(msg ? "/activate?err=" + encodeURIComponent(msg) : "/activate?ok=1");
+}
+
+export async function checkWithDollar44() {
+  await requireUser();
+  await checkNow();
+  revalidatePath("/", "layout");
+  redirect("/activate");
 }

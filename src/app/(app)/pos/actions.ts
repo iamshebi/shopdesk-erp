@@ -10,6 +10,10 @@ import { num } from "@/lib/util";
 export async function checkout(payload: Omit<SaleInput, "userId">): Promise<{ id?: number; error?: string }> {
   const user = await requireUser("pos");
   const s = await getSettings();
+  if (s.require_open_shift) {
+    const { openShiftOf } = await import("@/lib/shifts");
+    if (!(await openShiftOf(user.id))) return { error: "Open your cash shift first (menu: Cash shift)." };
+  }
   const canPrice = can(user, "sales.price");
   const canDiscount = can(user, "sales.discount");
   const notes: string[] = [];

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { q, one } from "@/lib/db";
+import { getLicenseStatus } from "@/lib/license";
 import { requireUser, can, type User } from "@/lib/auth";
 import { log } from "@/lib/activity";
 import { ALL_PERMS } from "@/lib/permissions";
@@ -32,6 +33,11 @@ export async function addUser(fd: FormData) {
   if (password.length < 6) back("Password must be at least 6 characters");
   const username = str(fd, "username").toLowerCase().replace(/\s+/g, "");
   if (!username || !str(fd, "name")) back("Name and username are required");
+  const lic = await getLicenseStatus();
+  if (lic.maxUsers > 0) {
+    const n = await one<{ n: number }>("SELECT count(*)::int n FROM users WHERE active");
+    if ((n?.n ?? 0) >= lic.maxUsers) back(`Your ${lic.plan.label} plan allows ${lic.maxUsers} active staff logins. Turn one off, or ask DOLLAR44 to upgrade the plan.`);
+  }
   const exists = await one("SELECT 1 FROM users WHERE lower(username)=$1", [username]);
   if (exists) back("That username is already taken");
   await q("INSERT INTO users (name, username, password_hash, role, role_id) VALUES ($1,$2,$3,$4,$5)", [
@@ -64,6 +70,11 @@ export async function toggleUser(fd: FormData) {
   if (!target) back("Not found");
   if (target.locked && !isOwner(me)) back("Only an owner can disable an owner");
   if (target.locked && target.active && (await activeOwners(id)) === 0) back("There must always be at least one active owner");
+  if (!target.active) {
+    const lic = await getLicenseStatus();
+    const n = await one<{ n: number }>("SELECT count(*)::int n FROM users WHERE active");
+    if (lic.maxUsers > 0 && (n?.n ?? 0) >= lic.maxUsers) back(`Your ${lic.plan.label} plan allows ${lic.maxUsers} active staff logins. Ask DOLLAR44 to upgrade the plan.`);
+  }
   await q("UPDATE users SET active = NOT active WHERE id=$1", [id]);
   await log(me.id, target.active ? "Staff login disabled" : "Staff login enabled", target.name, "/settings/staff");
   revalidatePath("/settings/staff");

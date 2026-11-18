@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (lic.locked) redirect("/activate");
   const s = await getSettings();
   const NAV_PERMS: Record<string, string[]> = {
-    dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], accounting: ["accounting"], crm: ["crm"], support: ["support"], hr: ["hr", "payroll"], tasks: ["tasks"], marketing: ["marketing"], shipping: ["shipping"], automation: ["integrations"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
+    dashboard: [], pos: ["pos"], shifts: ["pos", "shifts.all"], cheques: ["cheques"], orders: ["orders"], website: ["website"], accounting: ["accounting"], crm: ["crm"], support: ["support"], hr: ["hr", "payroll"], tasks: ["tasks"], marketing: ["marketing"], shipping: ["shipping"], automation: ["integrations"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
     purchases: ["purchases"], suppliers: ["suppliers"], customers: ["customers"], expenses: ["expenses"],
     reports: ["reports", "reports.day", "reports.vat"], settings: ["settings", "staff", "data", "activity", "integrations"],
   };
@@ -61,6 +61,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { title: "System health & logs", href: "/settings/system", perm: "settings" },
     { title: "Team, support & delivery reports", href: "/reports/performance", perm: "reports" },
     { title: "Record an expense", href: "/expenses", perm: "expenses" },
+    { title: "Open or close my cash shift", href: "/shifts", perm: "pos" },
+    { title: "Add a cheque (PDC)", href: "/cheques?add=1", perm: "cheques" },
     { title: "Day close", href: "/reports/day", perm: "reports.day" },
     { title: "VAT return report", href: "/reports/vat", perm: "reports.vat" },
     { title: "Staff & roles", href: "/settings/staff", perm: "staff" },
@@ -89,7 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : canAny(user, ["integrations"]) ? "/settings/integrations" : "/settings/activity"}
       />
       <IdleLogout minutes={s.idle_timeout_minutes} />
-      <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8"><LicenseBanner state={lic.state} daysLeft={lic.daysLeft} endsOn={lic.endsOn} canRenew={canAny(user, ["settings"])} /><PageTools pins={pins} recent={recent} />{children}</main>
+      <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8"><LicenseBanner state={lic.state} daysLeft={lic.daysLeft} endsOn={lic.endsOn} canRenew={canAny(user, ["settings"])} checkWarning={lic.checkWarning} /><PageTools pins={pins} recent={recent} />{children}</main>
     </div>
   );
 }

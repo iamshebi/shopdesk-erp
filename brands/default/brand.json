@@ -12,5 +12,6 @@
   ],
   "license": true,
   "mode": "offline",
-  "url": ""
+  "url": "",
+  "statusUrl": "https://d44-licence.vercel.app/status.json"
 }

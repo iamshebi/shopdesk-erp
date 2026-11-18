@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { one } from "@/lib/db";
 import { requireUser, can } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
@@ -7,6 +8,10 @@ import Pos from "./pos";
 export default async function PosPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const user = await requireUser("pos");
   const s = await getSettings();
+  if (s.require_open_shift) {
+    const { openShiftOf } = await import("@/lib/shifts");
+    if (!(await openShiftOf(user.id))) redirect("/shifts?need=1");
+  }
   const sp = await searchParams;
   const preset = sp.add
     ? await one<any>(`SELECT p.id, p.name, p.brand, p.category, p.sku, p.barcode, p.price, p.cost, p.track_serial, p.is_service, ${STOCK_SQL} AS stock FROM products p WHERE p.id=$1`, [Number(sp.add)])

@@ -63,12 +63,33 @@
       <input id="subNum" type="number" min="1" max="3650" value="45" aria-label="Number" style="max-width:110px" />
       <select id="subUnit" aria-label="Unit"><option value="d">days</option><option value="m">months</option><option value="y">years</option></select>
     </div>
+    <div class="row">
+      <select id="subPlan" aria-label="Plan"><option value="basic">Basic (3 staff)</option><option value="pro" selected>Pro (10 staff)</option><option value="enterprise">Enterprise (no limit)</option></select>
+      <input id="subUsers" type="number" min="0" max="999" placeholder="Staff logins (optional)" aria-label="Staff logins" style="max-width:190px" />
+    </div>
     <div class="row"><button id="subMake">Make subscription key</button></div>
     <div id="subMsg"></div>
     <div id="subResult" class="hidden">
       <div class="sub" id="subInfo"></div>
       <div class="out" id="subKey"></div>
       <div class="row"><button id="subCopy">Copy key</button><button class="ghost" id="subWa">Send on WhatsApp</button></div>
+    </div>
+  </section>
+  <section class="card">
+    <label>4 · Cancel keys and publish updates</label>
+    <p class="sub" style="margin:4px 0 10px">Tick the keys to cancel, then make the status file and send it to be published at d44-licence.vercel.app/status.json. Clients' apps read it twice a day.</p>
+    <div id="hist"></div>
+    <label for="cancelExtra" style="margin-top:10px">Other licence IDs or request codes to cancel (one per line)</label>
+    <textarea id="cancelExtra" placeholder="EB4AFC93&#10;REQ-1A2B-3C4D-5E6F"></textarea>
+    <label for="upVer" style="margin-top:10px">Latest Windows app (optional)</label>
+    <div class="row"><input id="upVer" placeholder="Version, e.g. 2.4.0" style="max-width:170px" /><input id="upUrl" placeholder="Download link of the .exe" /></div>
+    <input id="upSha" placeholder="SHA-512 of the .exe (hex)" style="margin-top:8px" />
+    <input id="upNotes" placeholder="What changed (shown to clients)" style="margin-top:8px" />
+    <div class="row"><button id="statusMake">Make status file</button></div>
+    <div id="statusMsg"></div>
+    <div id="statusResult" class="hidden">
+      <div class="out" id="statusOut"></div>
+      <div class="row"><button id="statusCopy">Copy</button><a class="ghost" id="statusDl" download="status.json" href="#" style="padding:9px 14px;border-radius:10px;border:1px solid #cbd5e1;text-decoration:none;color:inherit">Download status.json</a></div>
     </div>
   </section>
 </main>
@@ -138,6 +159,7 @@ $("make").onclick = async () => {
     const key = "D44PC-" + b32encode(sig).match(/.{1,6}/g).join("-") + (site ? "@" + site : "");
     $("key").textContent = key;
     $("result").classList.remove("hidden");
+    remember({ kind: "pc", id: req, client: site || "offline", made: uaeToday() });
   } catch (e) {
     $("msg").innerHTML = `<div class="err">${e.message || e}</div>`;
   }
@@ -171,12 +193,17 @@ $("subMake").onclick = async () => {
     const months = unit === "y" ? n * 12 : unit === "m" ? n : 0;
     const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
     const plan = unit === "d" ? `${n} day${n === 1 ? "" : "s"}` : months === 12 ? "Yearly" : months === 1 ? "Monthly" : months % 12 === 0 ? `${months / 12} years` : `${months} months`;
-    const payload = { v: 1, id, c: client, p: plan, s: start, e: end.toISOString().slice(0, 10) };
+    const pl = $("subPlan").value;
+    const payload = { v: 1, id, c: client, p: plan, s: start, e: end.toISOString().slice(0, 10), pl };
+    const mu = $("subUsers").value.trim();
+    if (mu !== "") payload.mu = Math.max(0, Math.floor(Number(mu)));
     const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
     const priv = await checkPair(privB64);
     const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(body)));
     $("subKey").textContent = `D44-${body}.${b64url(sig)}`;
-    $("subInfo").textContent = `${client} · ${plan} · ${payload.s} to ${payload.e} · ID ${id}`;
+    const planName = { basic: "Basic", pro: "Pro", enterprise: "Enterprise" }[pl];
+    $("subInfo").textContent = `${client} · ${planName} · ${plan} · ${payload.s} to ${payload.e} · ID ${id}`;
+    remember({ kind: "subscription", id, client, plan: planName, period: plan, from: payload.s, to: payload.e, made: uaeToday() });
     $("subResult").classList.remove("hidden");
   } catch (e) {
     $("subMsg").innerHTML = `<div class="err">${e.message || e}</div>`;
@@ -187,6 +214,43 @@ $("subWa").onclick = () => {
   const t = `Your DOLLAR44 ERP subscription key (${$("subInfo").textContent}):\n\n${$("subKey").textContent}\n\nOpen Settings → Subscription, paste it and press Activate.`;
   location.href = "https://wa.me/?text=" + encodeURIComponent(t);
 };
+const HIST = "dollar44-issued-keys";
+function history() { try { return JSON.parse(localStorage.getItem(HIST) || "[]"); } catch { return []; } }
+function remember(e) { try { const h = history().filter((x) => !(x.kind === e.kind && x.id === e.id)); h.unshift(e); localStorage.setItem(HIST, JSON.stringify(h.slice(0, 500))); } catch {} renderHist(); }
+function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+function renderHist() {
+  const h = history();
+  $("hist").innerHTML = h.length ? h.map((e, i) => `<label style="display:flex;gap:8px;font-weight:400;font-size:13px;margin:4px 0"><input type="checkbox" data-i="${i}" ${e.cancelled ? "checked" : ""}/> <span>${e.kind === "pc" ? "PC" : "Subscription"} · <b>${esc(e.client)}</b> · ${esc(e.id)}${e.to ? ` · until ${esc(e.to)}` : ""}${e.plan ? ` · ${esc(e.plan)}` : ""}</span></label>`).join("") : '<div class="sub">Keys you make on this device appear here.</div>';
+  $("hist").querySelectorAll("input[type=checkbox]").forEach((c) => c.onchange = () => { const h2 = history(); h2[Number(c.dataset.i)].cancelled = c.checked; try { localStorage.setItem(HIST, JSON.stringify(h2)); } catch {} });
+}
+renderHist();
+$("statusMake").onclick = async () => {
+  $("statusMsg").innerHTML = ""; $("statusResult").classList.add("hidden");
+  try {
+    const privB64 = getPriv();
+    if (!privB64) throw new Error("Save your private key first (step 1).");
+    const h = history().filter((e) => e.cancelled);
+    const extra = $("cancelExtra").value.split(/\s+/).map((x) => x.trim()).filter(Boolean);
+    const revoked = [...new Set([...h.filter((e) => e.kind === "subscription").map((e) => e.id), ...extra.filter((x) => !/^REQ/i.test(x)).map((x) => x.toUpperCase())])];
+    const revokedPcs = [...new Set([...h.filter((e) => e.kind === "pc").map((e) => e.id), ...extra.filter((x) => /^REQ/i.test(x)).map((x) => normaliseRequest(x))])];
+    const data = { v: 1, t: new Date().toISOString(), revoked, revokedPcs };
+    if ($("upVer").value.trim()) {
+      if (!$("upUrl").value.trim() || !/^[0-9a-f]{128}$/i.test($("upSha").value.trim())) throw new Error("For an update, give the version, the download link and the 128-character SHA-512.");
+      data.app = { version: $("upVer").value.trim(), url: $("upUrl").value.trim(), sha512: $("upSha").value.trim().toLowerCase(), notes: $("upNotes").value.trim() };
+    }
+    const body = b64url(new TextEncoder().encode(JSON.stringify(data)));
+    const priv = await checkPair(privB64);
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(body)));
+    const text = JSON.stringify({ data: body, sig: b64url(sig) }, null, 1);
+    $("statusOut").textContent = text;
+    $("statusDl").href = URL.createObjectURL(new Blob([text + "\n"], { type: "application/json" }));
+    $("statusResult").classList.remove("hidden");
+    $("statusMsg").innerHTML = `<div class="ok">${revoked.length} subscription key(s) and ${revokedPcs.length} PC(s) cancelled${data.app ? `, update ${data.app.version}` : ""}.</div>`;
+  } catch (e) {
+    $("statusMsg").innerHTML = `<div class="err">${e.message || e}</div>`;
+  }
+};
+$("statusCopy").onclick = async () => { try { await navigator.clipboard.writeText($("statusOut").textContent); $("statusCopy").textContent = "Copied"; } catch {} };
 showSetup();
 </script>
 </body>

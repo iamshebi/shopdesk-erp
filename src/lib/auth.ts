@@ -14,6 +14,7 @@ export interface User {
   role_id: number;
   role: string; // role name, e.g. "Cashier"
   perms: string[];
+  blocked?: string[]; // permissions the DOLLAR44 plan does not include
   sid: string; // current session id
   totp_enabled: boolean;
 }
@@ -23,6 +24,7 @@ const PENDING_2FA = "sd_2fa";
 
 /** True if the user's role grants this permission (Owner has "*"). */
 export function can(user: User, perm: string) {
+  if (user.blocked?.includes(perm)) return false;
   return user.perms.includes("*") || user.perms.includes(perm);
 }
 
@@ -120,7 +122,9 @@ export const getUser = cache(async (): Promise<User | null> => {
     try {
       perms = JSON.parse(u.permissions);
     } catch {}
-    return { id: u.id, name: u.name, username: u.username, role_id: u.role_id, role: u.role, perms, sid: String(payload.sid), totp_enabled: u.totp_enabled };
+    const { getLicenseStatus } = await import("./license");
+    const blocked = (await getLicenseStatus()).plan.blocked;
+    return { id: u.id, name: u.name, username: u.username, role_id: u.role_id, role: u.role, perms, blocked, sid: String(payload.sid), totp_enabled: u.totp_enabled };
   } catch {
     return null;
   }

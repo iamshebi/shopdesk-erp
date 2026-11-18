@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { tr } from "@/lib/i18n";
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wrench, Recycle, Package, ScanLine, Truck, Building2,
-  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare, Gift, PackageCheck, Zap, Bell, CalendarDays, Star } from "lucide-react";
+  Users, Wallet, BarChart3, Settings, LogOut, Menu, X, UserCircle, Search, Moon, Sun, ChevronDown, Keyboard, Warehouse, ClipboardList, Globe, Landmark, Target, LifeBuoy, IdCard, KanbanSquare, Gift, PackageCheck, Zap, Bell, CalendarDays, Star, Banknote, FileCheck } from "lucide-react";
 import { logout } from "@/app/auth-actions";
 
 type Item = { area: string; href: string; label: string; icon: typeof LayoutDashboard; key?: string };
@@ -15,6 +15,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
     id: "main", label: "", items: [
       { area: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard, key: "D" },
       { area: "pos", href: "/pos", label: "New sale", icon: ShoppingCart, key: "N" },
+      { area: "shifts", href: "/shifts", label: "Cash shift", icon: Banknote },
     ],
   },
   {
@@ -46,6 +47,7 @@ const GROUPS: { id: string; label: string; items: Item[] }[] = [
   {
     id: "finance", label: "Finance", items: [
       { area: "expenses", href: "/expenses", label: "Expenses", icon: Wallet },
+      { area: "cheques", href: "/cheques", label: "Cheques (PDC)", icon: FileCheck },
       { area: "accounting", href: "/accounting", label: "Accounting", icon: Landmark, key: "A" },
       { area: "reports", href: "/reports", label: "Reports", icon: BarChart3 },
     ],

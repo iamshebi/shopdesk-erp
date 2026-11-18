@@ -1,6 +1,8 @@
 // The product and the company behind it. Each client's own shop name and logo come from Settings;
 // these are DOLLAR44's and stay the same in every copy.
 export const PRODUCT = "DOLLAR44 ERP";
+// DOLLAR44's signed status file: cancelled keys and the latest Windows app version.
+export const STATUS_URL = "https://d44-licence.vercel.app/status.json";
 export const VENDOR = {
   name: "DOLLAR44",
   tagline: "Build · Automate · Grow",

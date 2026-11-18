@@ -62,6 +62,8 @@ export const PERMISSION_GROUPS: { group: string; perms: Perm[] }[] = [
       { key: "expenses.delete", label: "Delete expenses" },
       { key: "reports", label: "Sales, profit & stock reports" },
       { key: "reports.day", label: "Day close (cash in drawer)" },
+      { key: "shifts.all", label: "See and close every cashier's shift", hint: "Cashiers with \"Make sales\" can always open and close their own shift" },
+      { key: "cheques", label: "Cheques: post-dated cheques received and issued" },
       { key: "reports.vat", label: "VAT return report" },
       { key: "accounting", label: "Accounting: ledger, P&L, balance sheet, bank" },
     ],
@@ -89,7 +91,7 @@ export const DEFAULT_ROLES: { name: string; perms: string[]; locked?: boolean }[
   {
     name: "Accountant",
     perms: ["sales.view", "sales.all", "sales.payments", "customers", "products.view", "products.cost", "imei", "purchases", "suppliers",
-      "dashboard.money", "expenses", "reports", "reports.day", "reports.vat", "data"],
+      "dashboard.money", "expenses", "reports", "reports.day", "reports.vat", "data", "cheques", "shifts.all"],
   },
   { name: "Cashier", perms: ["pos", "sales.view", "sales.discount", "customers", "products.view", "imei", "repairs", "repairs.deliver", "buyback"] },
   { name: "Technician", perms: ["repairs", "products.view", "imei"] },

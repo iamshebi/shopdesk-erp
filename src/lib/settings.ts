@@ -57,6 +57,7 @@ export interface ShopSettings {
   sheet_token: string;
   default_language: string;
   scheduled_report: string;
+  require_open_shift: boolean; // cashiers must open a cash shift before selling
   receipt_width: string; // "80" or "58" (mm thermal paper)
   label_size: string; // "a4" sheet, or a label-roll size in mm like "50x25"
   auto_receipt: boolean; // print the thermal receipt by itself after every sale
@@ -117,6 +118,7 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   sheet_token: "",
   default_language: "en",
   scheduled_report: "off",
+  require_open_shift: false,
   receipt_width: "80",
   label_size: "a4",
   auto_receipt: true,

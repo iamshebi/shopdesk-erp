@@ -180,4 +180,33 @@ function saveLicense(file, key) {
   fs.writeFileSync(file, JSON.stringify({ key: code + (site ? `@${normaliseSite(site)}` : ""), activatedAt: new Date().toISOString() }, null, 2));
 }
 
-module.exports = { getMachineId, getRequestCode, generateActivationKey, verifyActivationKey, checkLicense, saveLicense, normaliseRequest, normaliseSite, keySite, isJunkId };
+/**
+ * DOLLAR44's signed status file { data, sig }: cancelled PC request codes and subscription IDs, and the latest
+ * app version with its download link and SHA-512. Returns the data, or null if the signature is not DOLLAR44's.
+ */
+function verifyStatus(text, publicKeyB64 = PUBLIC_KEY_B64) {
+  try {
+    const f = JSON.parse(text);
+    if (typeof f.data !== "string" || typeof f.sig !== "string") return null;
+    const pub = crypto.createPublicKey({ key: Buffer.from(publicKeyB64, "base64"), format: "der", type: "spki" });
+    if (!crypto.verify(null, Buffer.from(f.data), pub, Buffer.from(f.sig, "base64url"))) return null;
+    const d = JSON.parse(Buffer.from(f.data, "base64url").toString("utf8"));
+    return d && d.v === 1 ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 1 if a > b, -1 if a < b, 0 if equal ("2.10.0" > "2.9.3"). */
+function compareVersions(a, b) {
+  const pa = String(a).split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0) ? 1 : -1;
+  }
+  return 0;
+}
+
+module.exports = {
+  verifyStatus,
+  compareVersions, getMachineId, getRequestCode, generateActivationKey, verifyActivationKey, checkLicense, saveLicense, normaliseRequest, normaliseSite, keySite, isJunkId };
