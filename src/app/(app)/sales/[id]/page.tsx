@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AutoReceipt from "@/components/auto-receipt";
 import { notFound, redirect } from "next/navigation";
 import { q, one } from "@/lib/db";
 import { requireUser, can } from "@/lib/auth";
@@ -38,9 +39,10 @@ export default async function SalePage({ params, searchParams }: { params: Promi
     <div className="max-w-4xl">
       {sp.new && (
         <div className="card mb-6 flex flex-wrap items-center justify-between gap-3 border-emerald-200 bg-emerald-50 p-4 fade-in">
-          <div className="font-medium text-emerald-800">{isCN ? "Return saved." : "Sale complete."} {sale.outstanding > 0.004 && `Balance due: ${num(sale.outstanding)}`}</div>
+          <div className="flex flex-wrap items-center gap-3"><span className="font-medium text-emerald-800">{isCN ? "Return saved." : "Sale complete."} {sale.outstanding > 0.004 && `Balance due: ${num(sale.outstanding)}`}</span>
+            {s.auto_receipt && <AutoReceipt saleId={sale.id} size={s.receipt_width === "58" ? "58" : "80"} />}</div>
           <div className="flex gap-2">
-            <a href={`/print/invoice/${sale.id}?format=thermal&auto=1`} target="_blank" className="btn-dark btn-sm"><Printer size={14} /> Receipt</a>
+            <a href={`/print/invoice/${sale.id}?format=thermal&auto=1`} target="_blank" className="btn-dark btn-sm"><Printer size={14} /> {s.auto_receipt ? "Reprint receipt" : "Receipt"}</a>
             <a href={`/print/invoice/${sale.id}?auto=1`} target="_blank" className="btn-ghost btn-sm"><Printer size={14} /> A4</a>
             {!isCN && <Link href="/pos" className="btn-primary btn-sm"><Plus size={14} /> Next sale</Link>}
           </div>

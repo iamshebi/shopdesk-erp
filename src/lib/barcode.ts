@@ -9,11 +9,44 @@ const CODE128 = [
   "114131","311141","411131","211412","211214","211232","2331112",
 ];
 
-/** SVG markup for a Code 128-B barcode (printable ASCII). */
+/**
+ * Code 128 symbol values for `text`. Long runs of digits (IMEIs, EANs, serials) use code set C, which packs
+ * two digits per symbol, so a 15-digit IMEI is about 40% narrower and its bars stay thick enough to scan
+ * on a 203 dpi thermal label. Everything else uses code set B.
+ */
+function code128Values(text: string) {
+  const chars = [...text].filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 126).join("");
+  const values: number[] = [];
+  let set: "B" | "C" | "" = "";
+  let i = 0;
+  const digitRun = (from: number) => {
+    let n = 0;
+    while (from + n < chars.length && chars[from + n] >= "0" && chars[from + n] <= "9") n++;
+    return n;
+  };
+  while (i < chars.length) {
+    const run = digitRun(i);
+    // Switch to C for runs of 4+ digits (or 2+ when the whole text is digits); keep an even count in C.
+    const useC = run >= 4 || (run >= 2 && run === chars.length - i && i === 0);
+    if (useC) {
+      const pairs = run - (run % 2);
+      if (set !== "C") { values.push(set === "" ? 105 : 99); set = "C"; }
+      for (let k = 0; k < pairs; k += 2) values.push(Number(chars.slice(i + k, i + k + 2)));
+      i += pairs;
+    } else {
+      if (set !== "B") { values.push(set === "" ? 104 : 100); set = "B"; }
+      values.push(chars.charCodeAt(i) - 32);
+      i += 1;
+    }
+  }
+  if (!values.length) values.push(104);
+  return values;
+}
+
+/** SVG markup for a Code 128 barcode (printable ASCII). */
 export function code128Svg(text: string, opts: { height?: number; module?: number } = {}) {
   const h = opts.height ?? 48, m = opts.module ?? 1.6;
-  const chars = [...text].filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 126);
-  const codes = [104, ...chars.map((c) => c.charCodeAt(0) - 32)];
+  const codes = code128Values(text);
   const check = codes.reduce((sum, c, i) => sum + c * (i === 0 ? 1 : i), 0) % 103;
   const all = [...codes, check, 106];
   let x = 10 * m; // quiet zone
@@ -27,7 +60,8 @@ export function code128Svg(text: string, opts: { height?: number; module?: numbe
     }
   }
   const width = x + 10 * m;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width.toFixed(2)} ${h}" preserveAspectRatio="none" fill="#000">${bars.join("")}</svg>`;
+  // crispEdges stops the printer driver from greying the bar edges, which makes thermal barcodes hard to scan.
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width.toFixed(2)} ${h}" preserveAspectRatio="none" shape-rendering="crispEdges" fill="#000">${bars.join("")}</svg>`;
 }
 
 /** EAN-13 check digit for the first 12 digits. */

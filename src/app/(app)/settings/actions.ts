@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { saveSettings } from "@/lib/settings";
 import { log } from "@/lib/activity";
 import { str, numf } from "@/lib/util";
+import { LABEL_SIZES } from "@/lib/print";
 
 export async function updateSettings(fd: FormData) {
   const user = await requireUser("settings");
@@ -26,6 +27,10 @@ export async function updateSettings(fd: FormData) {
     invoice_prefix: str(fd, "invoice_prefix") || "INV-",
     invoice_terms: str(fd, "invoice_terms"),
     repair_terms: str(fd, "repair_terms"),
+    receipt_width: str(fd, "receipt_width") === "58" ? "58" : "80",
+    auto_receipt: fd.get("auto_receipt") === "on",
+    receipt_counter: str(fd, "receipt_counter").slice(0, 10) || "1",
+    label_size: LABEL_SIZES.includes(str(fd, "label_size")) ? str(fd, "label_size") : "a4",
   });
   await log(user.id, "Shop settings changed", "", "/settings");
   revalidatePath("/", "layout");

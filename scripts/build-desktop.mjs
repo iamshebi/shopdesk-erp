@@ -20,12 +20,13 @@ const electronVersion = JSON.parse(fs.readFileSync(path.join(root, "node_modules
 const run = (cmd, env = {}) => execSync(cmd, { cwd: root, stdio: "inherit", env: { ...process.env, ...env } });
 const copy = (from, to) => fs.cpSync(from, to, { recursive: true, dereference: true });
 
-console.log(`\n▶ Building ${brand.productName} (${brandName})`);
-run("npx next build", { SHOPDESK_STANDALONE: "1", NEXT_TELEMETRY_DISABLED: "1" });
-
+const online = brand.mode === "online";
+console.log(`\n▶ Building ${brand.productName} (${brandName}) — ${online ? `online, opens ${brand.url}` : "offline, own database on the PC"}`);
 const out = path.join(root, "desktop-dist");
 fs.rmSync(out, { recursive: true, force: true });
 const server = path.join(out, "server");
+if (!online) {
+run("npx next build", { SHOPDESK_STANDALONE: "1", NEXT_TELEMETRY_DISABLED: "1" });
 copy(path.join(root, ".next/standalone"), server);
 copy(path.join(root, ".next/static"), path.join(server, ".next/static"));
 if (fs.existsSync(path.join(root, "public"))) copy(path.join(root, "public"), path.join(server, "public"));
@@ -35,10 +36,11 @@ fs.rmSync(path.join(server, ".data"), { recursive: true, force: true });
 // Image optimisation isn't used; drop the large native image library.
 for (const d of ["node_modules/sharp", "node_modules/@img"]) fs.rmSync(path.join(server, d), { recursive: true, force: true });
 fs.rmSync(path.join(server, ".env"), { force: true });
+}
 
 const appDir = path.join(out, "app");
 fs.mkdirSync(appDir, { recursive: true });
-for (const f of ["main.cjs", "backup.cjs"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
+for (const f of ["main.cjs", "backup.cjs", "license.cjs", "preload.cjs", "activate.html", "printers.html"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
 fs.copyFileSync(path.join(brandDir, "brand.json"), path.join(appDir, "brand.json"));
 fs.copyFileSync(path.join(brandDir, "icon.png"), path.join(appDir, "icon.png"));
 fs.writeFileSync(
@@ -54,8 +56,11 @@ const config = {
   directories: { app: appDir, output: path.join(root, "release", brandName) },
   // electron-builder always drops a node_modules folder at the root of "from", so copy the parent
   // folder and pick server/** — the server's node_modules (Next, PGlite, pg...) then gets included.
-  extraResources: [{ from: out, to: ".", filter: ["server/**/*"] }],
+  extraResources: online ? [] : [{ from: out, to: ".", filter: ["server/**/*"] }],
   asar: true,
+  // The desktop shell uses only Electron and Node built-ins. Without this, electron-builder falls back to the
+  // project's node_modules (Next, React…) and the installer triples in size.
+  files: ["**/*", "!**/node_modules/**"],
   // No auto-update feed: installers are handed to each shop directly.
   publish: null,
   win: { target: [{ target: "nsis", arch: ["x64"] }], icon: path.join(brandDir, "icon.png") },

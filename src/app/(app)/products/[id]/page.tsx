@@ -60,6 +60,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         <Badge tone={STATUS_TONE[p.status] ?? "slate"}>{p.status}</Badge>
         {can(user, "pos") && p.status === "active" && <Link href={`/pos?add=${p.id}`} className="btn-primary">Sell</Link>}
         <Link href={`/print/labels?ids=${p.id}`} target="_blank" className="btn-ghost"><Tag size={16} /> Label</Link>
+        {p.track_serial && units.some((u) => u.status === "in_stock") && <Link href={`/print/labels?product=${p.id}&imei=1`} target="_blank" className="btn-ghost"><Tag size={16} /> IMEI labels</Link>}
         {canEdit && !p.barcode && <form action={generateBarcode}><input type="hidden" name="id" value={p.id} /><Submit className="btn-ghost"><Barcode size={16} /> Make barcode</Submit></form>}
         {canEdit && <form action={duplicateProduct}><input type="hidden" name="id" value={p.id} /><Submit className="btn-ghost"><Copy size={16} /> Duplicate</Submit></form>}
         {canEdit && <form action={toggleProduct}>
@@ -180,6 +181,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     {showCost && <td className="text-right tabular-nums">{num(u.cost)}</td>}
                     <td className="text-slate-500">{fmtDate(u.created_at)}</td>
                     <td className="text-right">
+                      <Link href={`/print/labels?units=${u.id}`} target="_blank" className="btn-ghost btn-sm mr-1"><Tag size={13} /> Label</Link>
                       {u.status === "in_stock" && canAdjust && (
                         <form action={writeOffUnit}>
                           <input type="hidden" name="unit_id" value={u.id} />

@@ -126,6 +126,7 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
 
   const pays = input.payments.filter((p) => p.amount > 0 && p.method !== "credit");
   let paid = r2(pays.reduce((a, p) => a + p.amount, 0));
+  const tendered = paid; // what the customer handed over (before change is given back), shown on the receipt
   if (paid > total) {
     // Extra cash is change given back: trim the cash payment.
     let extra = r2(paid - total);
@@ -164,9 +165,9 @@ export async function createSale(t: Exec, s: ShopSettings, input: SaleInput): Pr
   }
   const number = await nextNumber(t, "invoice", s.invoice_prefix || "INV-");
   const [sale] = await t<{ id: number }>(
-    `INSERT INTO sales (number, type, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, discount, vat, total, cost, paid, notes, repair_id, created_by, coupon_code, due_date)
-     VALUES ($1,'invoice',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
-    [number, customerId, input.customer.name, input.customer.phone, input.customer.trn, input.customer.address, subtotal, discount, vat, total, cost, paid, input.notes ?? "", input.repair_id ?? null, input.userId, coupon?.code ?? "", input.due_date ?? null],
+    `INSERT INTO sales (number, type, customer_id, customer_name, customer_phone, customer_trn, customer_address, subtotal, discount, vat, total, cost, paid, notes, repair_id, created_by, coupon_code, due_date, tendered)
+     VALUES ($1,'invoice',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
+    [number, customerId, input.customer.name, input.customer.phone, input.customer.trn, input.customer.address, subtotal, discount, vat, total, cost, paid, input.notes ?? "", input.repair_id ?? null, input.userId, coupon?.code ?? "", input.due_date ?? null, tendered],
   );
 
   for (const c of computed) {

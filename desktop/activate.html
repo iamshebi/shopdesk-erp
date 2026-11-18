@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: file:" />
+<title>Activate</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; background: #f6f7f9; color: #0f172a; display: grid; place-items: center; min-height: 100vh; }
+  .card { width: 520px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; box-shadow: 0 10px 30px -12px rgba(15,23,42,.18); }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: #64748b; margin: 4px 0 22px; }
+  .step { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin: 18px 0 6px; }
+  .code { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f1f5f9; border-radius: 12px; padding: 12px 14px; font: 600 20px Consolas, ui-monospace, monospace; letter-spacing: .04em; }
+  textarea { width: 100%; min-height: 76px; font: 13px Consolas, ui-monospace, monospace; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; resize: none; text-transform: uppercase; }
+  textarea:focus { outline: 2px solid #0f766e33; border-color: #0f766e; }
+  button { font: 600 13px "Segoe UI", system-ui, sans-serif; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; background: #eef2f6; color: #0f172a; }
+  button.primary { background: #0f766e; color: #fff; padding: 10px 18px; }
+  button.wa { background: #16a34a; color: #fff; }
+  .row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+  .grow { flex: 1; }
+  .err { color: #b91c1c; margin-top: 8px; min-height: 20px; }
+  .foot { margin-top: 22px; font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="title">Activate</h1>
+  <div class="sub">This copy needs a one-time activation for this computer. No internet needed.</div>
+
+  <div class="step">1 · Send this code to your supplier</div>
+  <div class="code"><span id="req">…</span><button id="copy">Copy</button></div>
+  <div class="row"><button class="wa" id="wa">Send on WhatsApp</button><span class="grow"></span></div>
+
+  <div class="step">2 · Paste the activation key you receive</div>
+  <textarea id="key" placeholder="SD1-XXXXXX-XXXXXX-…" spellcheck="false"></textarea>
+  <div class="err" id="err"></div>
+  <div class="row"><button class="primary" id="activate">Activate</button><span class="grow"></span><button id="quit">Exit</button></div>
+  <div class="foot" id="foot"></div>
+</div>
+<script>
+const api = window.shopdeskDesktop.license;
+const $ = (id) => document.getElementById(id);
+api.info().then((i) => {
+  $("req").textContent = i.requestCode;
+  $("title").textContent = `Activate ${i.productName}`;
+  document.title = `Activate ${i.productName}`;
+  $("foot").textContent = i.support ? `Support: ${i.support}` : "";
+});
+$("copy").onclick = async () => { await api.copy($("req").textContent); $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy"), 1500); };
+$("wa").onclick = () => api.whatsapp();
+$("quit").onclick = () => api.quit();
+$("activate").onclick = async () => {
+  $("err").textContent = "";
+  const ok = await api.activate($("key").value);
+  if (!ok) $("err").textContent = "That key doesn't match this computer. Check it was made for the code above.";
+};
+$("key").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("activate").click(); } });
+</script>
+</body>
+</html>

@@ -57,6 +57,10 @@ export interface ShopSettings {
   sheet_token: string;
   default_language: string;
   scheduled_report: string;
+  receipt_width: string; // "80" or "58" (mm thermal paper)
+  label_size: string; // "a4" sheet, or a label-roll size in mm like "50x25"
+  auto_receipt: boolean; // print the thermal receipt by itself after every sale
+  receipt_counter: string; // counter number printed on receipts
 }
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -113,6 +117,10 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   sheet_token: "",
   default_language: "en",
   scheduled_report: "off",
+  receipt_width: "80",
+  label_size: "a4",
+  auto_receipt: true,
+  receipt_counter: "1",
   couriers: "Aramex|https://www.aramex.com/track/results?ShipmentNumber={n}\nDHL|https://www.dhl.com/ae-en/home/tracking.html?tracking-id={n}\nEmirates Post|https://www.emiratespost.ae/track?trackno={n}\nOwn driver|",
 };
 

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ShopDesk licence keys</title>
+<style>
+  :root { --a: #0f766e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background: #f6f7f9; color: #0f172a; }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; color: #64748b; font-size: 13px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input, textarea { width: 100%; font: 15px ui-monospace, Menlo, Consolas, monospace; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; }
+  textarea { min-height: 84px; resize: vertical; }
+  button { font: 600 14px system-ui, sans-serif; border: 0; border-radius: 10px; padding: 10px 14px; background: var(--a); color: #fff; cursor: pointer; }
+  button.ghost { background: #eef2f6; color: #0f172a; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .out { font: 14px ui-monospace, Menlo, Consolas, monospace; word-break: break-all; background: #f1f5f9; border-radius: 10px; padding: 12px; margin-top: 12px; }
+  .err { color: #b91c1c; font-size: 13px; margin-top: 8px; }
+  .ok { color: #047857; font-size: 13px; margin-top: 8px; }
+  .hidden { display: none; }
+  small { color: #64748b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ShopDesk licence keys</h1>
+  <p class="sub">Works offline. Paste a shop's Request Code to get its Activation Key. Keep this page and your private key to yourself.</p>
+
+  <section class="card" id="setup">
+    <label for="priv">1 · Your private key (one time)</label>
+    <textarea id="priv" placeholder="Paste the text from shopdesk-license-PRIVATE-KEY.txt"></textarea>
+    <div class="row"><button id="savePriv">Save on this device</button></div>
+    <div id="privMsg"></div>
+  </section>
+
+  <section class="card">
+    <label for="req">2 · Shop's Request Code</label>
+    <input id="req" placeholder="REQ-1A2B-3C4D-5E6F" autocomplete="off" autocapitalize="characters" />
+    <div class="row"><button id="make">Make Activation Key</button><button class="ghost" id="forget">Forget private key</button></div>
+    <div id="msg"></div>
+    <div id="result" class="hidden">
+      <div class="out" id="key"></div>
+      <div class="row"><button id="copy">Copy key</button><button class="ghost" id="wa">Send on WhatsApp</button></div>
+    </div>
+  </section>
+  <p><small>Needs Chrome 137 or newer (or a recent Samsung Internet / Safari / Edge).</small></p>
+</main>
+<script>
+const PUBLIC_KEY_B64 = "MCowBQYDK2VwAyEAx9MNCzWltEUTynEWdHkiMri5ITnuF256wHB8Ud9PqmI=";
+const STORE = "shopdesk-license-private-key";
+const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const $ = (id) => document.getElementById(id);
+
+function b64ToBytes(b64) { const s = atob(b64.replace(/\s+/g, "")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); }
+function b32encode(bytes) {
+  let bits = 0, value = 0, out = "";
+  for (const b of bytes) { value = (value << 8) | b; bits += 8; while (bits >= 5) { out += B32[(value >>> (bits - 5)) & 31]; bits -= 5; } }
+  if (bits > 0) out += B32[(value << (5 - bits)) & 31];
+  return out;
+}
+function normaliseRequest(code) {
+  const hex = String(code || "").toUpperCase().replace(/^REQ/, "").replace(/[^0-9A-F]/g, "");
+  if (hex.length !== 12) throw new Error("A request code looks like REQ-1A2B-3C4D-5E6F");
+  return `REQ-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`;
+}
+function getPriv() { try { return localStorage.getItem(STORE) || ""; } catch { return ""; } }
+function showSetup() {
+  const has = !!getPriv();
+  $("privMsg").innerHTML = has ? '<div class="ok">Private key saved on this device.</div>' : "";
+  $("priv").value = "";
+  $("priv").placeholder = has ? "Saved. Paste again only to replace it." : "Paste the text from shopdesk-license-PRIVATE-KEY.txt";
+}
+async function checkPair(privB64) {
+  const priv = await crypto.subtle.importKey("pkcs8", b64ToBytes(privB64), { name: "Ed25519" }, false, ["sign"]);
+  const pub = await crypto.subtle.importKey("spki", b64ToBytes(PUBLIC_KEY_B64), { name: "Ed25519" }, false, ["verify"]);
+  const test = new TextEncoder().encode("REQ-0000-0000-0000");
+  const sig = await crypto.subtle.sign({ name: "Ed25519" }, priv, test);
+  if (!(await crypto.subtle.verify({ name: "Ed25519" }, pub, sig, test))) throw new Error("This private key does not match the ShopDesk app.");
+  return priv;
+}
+$("savePriv").onclick = async () => {
+  const v = $("priv").value.trim();
+  $("privMsg").innerHTML = "";
+  if (!v) return;
+  try {
+    await checkPair(v);
+    localStorage.setItem(STORE, v);
+    showSetup();
+  } catch (e) {
+    $("privMsg").innerHTML = `<div class="err">${e.name === "NotSupportedError" ? "This browser can't do Ed25519. Update Chrome." : e.message || "That doesn't look like the private key."}</div>`;
+  }
+};
+$("forget").onclick = () => { try { localStorage.removeItem(STORE); } catch {} showSetup(); $("result").classList.add("hidden"); };
+$("make").onclick = async () => {
+  $("msg").innerHTML = ""; $("result").classList.add("hidden");
+  try {
+    const privB64 = getPriv();
+    if (!privB64) throw new Error("Save your private key first (step 1).");
+    const req = normaliseRequest($("req").value);
+    $("req").value = req;
+    const priv = await checkPair(privB64);
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(req)));
+    const key = "SD1-" + b32encode(sig).match(/.{1,6}/g).join("-");
+    $("key").textContent = key;
+    $("result").classList.remove("hidden");
+  } catch (e) {
+    $("msg").innerHTML = `<div class="err">${e.message || e}</div>`;
+  }
+};
+$("copy").onclick = async () => { try { await navigator.clipboard.writeText($("key").textContent); $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy key"), 1500); } catch {} };
+$("wa").onclick = () => {
+  const t = `Your ShopDesk activation key:\n\n${$("key").textContent}\n\nPaste it in the activation screen and press Activate.`;
+  location.href = "https://wa.me/?text=" + encodeURIComponent(t);
+};
+showSetup();
+</script>
+</body>
+</html>

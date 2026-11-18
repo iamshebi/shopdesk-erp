@@ -30,7 +30,8 @@ export default async function RepairPage({ params, searchParams }: { params: Pro
     <div className="max-w-5xl">
       <PageHeader title={`${r.number} · ${r.device}`} subtitle={`${r.customer_name} · ${r.customer_phone} · received ${fmtDate(r.created_at, true)}`}>
         <Badge tone={repairTone(r.status)}>{repairLabel(r.status)}</Badge>
-        <a href={`/print/repair/${r.id}${sp.new ? "?auto=1" : ""}`} target="_blank" className="btn-ghost"><Printer size={16} /> Job card</a>
+        <a href={`/print/repair/${r.id}?format=thermal${sp.new ? "&auto=1" : ""}`} target="_blank" className="btn-dark"><Printer size={16} /> Ticket</a>
+        <a href={`/print/repair/${r.id}`} target="_blank" className="btn-ghost"><Printer size={16} /> A4 job card</a>
       </PageHeader>
       {sp.new && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">Job card created. Print it for the customer and stick the tag on the device.</div>}
       {sp.saved && <div className="card mb-4 bg-emerald-50 p-3 text-sm text-emerald-700">Saved.</div>}

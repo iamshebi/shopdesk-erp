@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Printer setup</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; background: #f6f7f9; color: #0f172a; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #64748b; margin: 0 0 18px; font-size: 13px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  label { display: block; font-weight: 600; margin-bottom: 2px; }
+  .hint { color: #64748b; font-size: 12px; margin-bottom: 8px; }
+  select { width: 100%; font: 14px "Segoe UI", system-ui, sans-serif; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row select { flex: 1; }
+  button { font: 600 13px "Segoe UI", system-ui, sans-serif; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; background: #eef2f6; color: #0f172a; white-space: nowrap; }
+  button.primary { background: #0f766e; color: #fff; }
+  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .msg { color: #047857; font-size: 13px; margin-top: 8px; min-height: 18px; }
+</style>
+</head>
+<body>
+<h1>Printer setup</h1>
+<p class="sub">Pick a printer for each job and ShopDesk prints straight to it, with no print window and no page headers. Leave "Ask every time" to choose each time.</p>
+
+<div class="card">
+  <label for="receipt">Receipts and repair tickets</label>
+  <div class="hint">Your 80 mm or 58 mm thermal printer (Epson TM-T20/T82, Xprinter, Rongta…)</div>
+  <div class="row"><select id="receipt"></select><button data-test="receipt">Test</button></div>
+</div>
+<div class="card">
+  <label for="label">Barcode and IMEI labels</label>
+  <div class="hint">Your label printer (Zebra, TSC, Xprinter XP-365B, Godex…). Set the label size in Settings → Printing.</div>
+  <div class="row"><select id="label"></select><button data-test="label">Test</button></div>
+</div>
+<div class="card">
+  <label for="a4">A4 invoices, job cards and reports</label>
+  <div class="hint">Your normal office printer</div>
+  <div class="row"><select id="a4"></select><button data-test="a4">Test</button></div>
+</div>
+<div class="msg" id="msg"></div>
+<div class="actions"><button id="close">Close</button><button class="primary" id="save">Save</button></div>
+<script>
+const api = window.shopdeskDesktop.printers;
+const $ = (id) => document.getElementById(id);
+api.list().then(({ printers, prefs }) => {
+  for (const kind of ["receipt", "label", "a4"]) {
+    const sel = $(kind);
+    sel.innerHTML = '<option value="">Ask every time</option>' + printers.map((p) => `<option>${p.name.replace(/</g, "&lt;")}</option>`).join("");
+    sel.value = prefs[kind] || "";
+  }
+});
+const current = () => ({ receipt: $("receipt").value, label: $("label").value, a4: $("a4").value });
+$("save").onclick = async () => { await api.save(current()); $("msg").textContent = "Saved."; };
+$("close").onclick = () => window.close();
+for (const b of document.querySelectorAll("[data-test]")) {
+  b.onclick = async () => {
+    await api.save(current());
+    $("msg").textContent = "Sending a test page…";
+    const r = await api.test(b.dataset.test);
+    $("msg").textContent = r.ok ? "Test page sent." : `Not printed: ${r.reason || "cancelled"}`;
+  };
+}
+</script>
+</body>
+</html>

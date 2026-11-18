@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { EMIRATES } from "@/lib/util";
+import { LABEL_SIZE_OPTIONS } from "@/lib/print";
 import { PageHeader, Field } from "@/components/ui";
 import Submit from "@/components/submit";
 import LogoInput from "./logo-input";
@@ -57,6 +58,32 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </div>
           <Field label="Invoice terms (printed at bottom)"><textarea name="invoice_terms" defaultValue={s.invoice_terms} rows={3} className="input" /></Field>
           <Field label="Repair job card terms"><textarea name="repair_terms" defaultValue={s.repair_terms} rows={3} className="input" /></Field>
+        </section>
+
+        <section className="card space-y-4 p-6">
+          <div>
+            <h2 className="font-semibold">Printing</h2>
+            <p className="text-sm text-slate-500">Receipts and repair tickets print on the thermal printer; barcode and IMEI labels on the label printer. In the Windows app, choose the printers in File → Printer setup.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Receipt paper">
+              <select name="receipt_width" defaultValue={s.receipt_width} className="input">
+                <option value="80">80 mm thermal (most shops)</option>
+                <option value="58">58 mm thermal (small printers)</option>
+              </select>
+            </Field>
+            <Field label="Counter number (printed on receipts)">
+              <input name="receipt_counter" defaultValue={s.receipt_counter} className="input" maxLength={10} />
+            </Field>
+            <label className="flex items-center gap-2 self-end pb-2 text-sm">
+              <input type="checkbox" name="auto_receipt" defaultChecked={s.auto_receipt} /> Print the receipt automatically after every sale
+            </label>
+            <Field label="Labels">
+              <select name="label_size" defaultValue={s.label_size} className="input">
+                {LABEL_SIZE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </Field>
+          </div>
         </section>
         <Submit>Save settings</Submit>
       </form>

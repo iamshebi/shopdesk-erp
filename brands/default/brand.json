@@ -5,5 +5,8 @@
   "port": 4300,
   "supportName": "SHABEEB · iamshebi.xyz",
   "supportPhone": "",
-  "supportWebsite": "https://iamshebi.xyz"
+  "supportWebsite": "https://iamshebi.xyz",
+  "license": true,
+  "mode": "online",
+  "url": "https://erpsoftware.uae.iamshebi.xyz"
 }
