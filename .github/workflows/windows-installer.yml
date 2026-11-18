@@ -1,5 +1,10 @@
 name: Build Windows installer
 
+# Release a new version:  bump "version" in package.json, commit, then push a tag like v2.3.0.
+# The installer is built on Windows and published as a GitHub release; installed apps pick it up
+# through the website (/api/desktop/update) and update themselves.
+# "Run workflow" (manual) builds any brand without publishing; download it from the run's artifacts.
+
 on:
   workflow_dispatch:
     inputs:
@@ -9,6 +14,9 @@ on:
         default: default
   push:
     tags: ["v*"]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -20,9 +28,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
+      - name: Build (and publish on version tags)
+        run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
+        env:
+          SHOPDESK_PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ github.event.inputs.brand || 'default' }}
-          path: release/*/*.exe
+          path: |
+            release/*/*.exe
+            release/*/latest.yml
           if-no-files-found: error

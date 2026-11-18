@@ -17,11 +17,14 @@ export async function restoreBackup(data: any) {
   if (data?.app !== "shopdesk" || !data.tables) throw new Error("This is not a ShopDesk backup file");
   await tx(async (t) => {
     const [secret] = await t<{ value: string }>("SELECT value FROM settings WHERE key='session_secret'");
+    // Keep the "factory reset already done" marker, or a restore would be wiped again by the hosting-side reset switch.
+    const [resetDone] = await t<{ value: string }>("SELECT value FROM settings WHERE key='factory_reset_done'");
     await t(`TRUNCATE ${BACKUP_TABLES.join(", ")} RESTART IDENTITY CASCADE`);
     for (const table of BACKUP_TABLES) {
       const rows: Record<string, unknown>[] = data.tables[table] ?? [];
       for (const raw of rows) {
         const r: Record<string, unknown> = { ...raw };
+        if (table === "settings" && (r.key === "session_secret" || r.key === "factory_reset_done")) continue;
         if (table === "files" && typeof r.data_b64 === "string") { r.data = Buffer.from(r.data_b64, "base64"); delete r.data_b64; }
         if (table === "files" && !r.data) continue;
         const cols = Object.keys(r);
@@ -34,6 +37,7 @@ export async function restoreBackup(data: any) {
       }
     }
     if (secret) await t("INSERT INTO settings (key, value) VALUES ('session_secret', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [secret.value]);
+    if (resetDone) await t("INSERT INTO settings (key, value) VALUES ('factory_reset_done', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [resetDone.value]);
   });
   // Backups made before warehouses existed: put all stock in the main warehouse.
   await tx(async (t) => {

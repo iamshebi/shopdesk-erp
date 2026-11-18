@@ -400,6 +400,7 @@ function buildMenu() {
         { label: "Open backups folder", click: () => { fs.mkdirSync(backupDir, { recursive: true }); shell.openPath(backupDir); } },
         { type: "separator" },
         { label: "Printer setup…", click: openPrinterSetup },
+        ...(ONLINE ? [{ type: "separator" }, { label: "Move offline data online…", click: () => moveOfflineDataOnline(true) }] : []),
         { type: "separator" },
         {
           label: "Use on other devices…",
@@ -441,6 +442,8 @@ function buildMenu() {
               ].filter(Boolean).join("\n"),
             }),
         },
+        { label: "Check for updates…", click: checkForUpdatesNow },
+        { type: "separator" },
         { label: "Show data folder", click: () => shell.openPath(dataDir) },
         { label: "Show engine log", click: () => shell.openPath(logFile) },
       ],
@@ -503,6 +506,179 @@ function createWindow() {
   );
 }
 
+// ---------- moving offline data online ----------
+// Earlier versions kept the shop's data on this PC (%APPDATA%\<Product>\data). The online version offers once
+// to upload it, so invoices, stock, IMEIs, customers and staff logins carry over. The PC copy is never deleted.
+const zlib = require("zlib");
+
+function hasOfflineData() {
+  return fs.existsSync(path.join(dataDir, "PG_VERSION"));
+}
+
+function dumpOfflineData(outFile) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(__dirname, "migrate-dump.cjs"), dataDir, outFile], {
+      cwd: __dirname,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let out = "", err = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    child.on("exit", () => {
+      try {
+        const r = JSON.parse(out.trim().split("\n").pop());
+        if (r.ok) return resolve(r.summary);
+        reject(new Error(r.error));
+      } catch {
+        reject(new Error(err.trim().split("\n").pop() || "Could not read the offline data"));
+      }
+    });
+  });
+}
+
+async function uploadOfflineData(file, replace) {
+  const { session } = require("electron");
+  const body = zlib.gzipSync(fs.readFileSync(file));
+  const res = await session.defaultSession.fetch(`${BASE}/api/desktop/migrate`, {
+    method: "POST",
+    headers: { "content-type": "application/gzip", ...(replace ? { "x-replace": "yes" } : {}) },
+    body,
+  });
+  let json = {};
+  try { json = await res.json(); } catch {}
+  return { status: res.status, ...json };
+}
+
+async function moveOfflineDataOnline(manual) {
+  if (!hasOfflineData()) {
+    if (manual) dialog.showMessageBox(win, { message: "No offline data on this computer", detail: `Nothing found in ${dataDir}.` });
+    return;
+  }
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+  fs.mkdirSync(backupDir, { recursive: true });
+  const file = path.join(backupDir, `offline-data-${stamp}.json`);
+  let summary;
+  try {
+    summary = await dumpOfflineData(file);
+  } catch (e) {
+    log(`move online: read failed: ${e.message}`);
+    dialog.showErrorBox("Couldn't read the offline data", `${e.message}\n\nThe data on this PC was not changed. Please contact support.`);
+    return;
+  }
+  log(`move online: saved ${file} ${JSON.stringify(summary)}`);
+  const what = `${summary.sales} invoices, ${summary.products} products, ${summary.customers} customers, ${summary.repairs} repair jobs and ${summary.users} staff logins`;
+  const ask = await dialog.showMessageBox(win, {
+    type: "question",
+    message: `Move ${summary.shopName || "this shop"}'s data online?`,
+    detail:
+      `This computer has data from the offline version: ${what}.\n\n` +
+      `It will be uploaded to ${BASE}. Everyone signs in with the same usernames and passwords as before, and the owner can see everything from any phone or computer.\n\n` +
+      `A copy was saved first: ${file}`,
+    buttons: ["Move it online now", "Not now"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (ask.response !== 0) {
+    if (!manual) savePrefs({ moveAskedAt: new Date().toISOString() });
+    return;
+  }
+  let r;
+  try {
+    r = await uploadOfflineData(file, false);
+    if (r.status === 409 && r.error === "needs_owner") {
+      await dialog.showMessageBox(win, {
+        message: "The online system is already set up",
+        detail: "Sign in as the owner first, then choose File → Move offline data online… again. Moving will replace what is online with this computer's data.",
+      });
+      return;
+    }
+    if (r.status === 409 && r.error === "has_data") {
+      const c = await dialog.showMessageBox(win, {
+        type: "warning",
+        message: "Replace the online data?",
+        detail: `The online system already has data. Moving will REPLACE it with this computer's data (${what}).\n\nOnly do this if the online data is a test or not needed.`,
+        buttons: ["Replace online data", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+      });
+      if (c.response !== 0) return;
+      r = await uploadOfflineData(file, true);
+    }
+  } catch (e) {
+    r = { status: 0, error: e.message };
+  }
+  if (!r.ok) {
+    log(`move online: upload failed ${r.status} ${r.error} ${r.detail || ""}`);
+    const big = r.status === 413 ? "\n\nThe data is too large to send in one go. Please contact support." : "";
+    dialog.showErrorBox("Couldn't move the data", `${r.error || "Upload failed"} (${r.status || "no connection"})${big}\n\nNothing on this computer was changed. Your copy: ${file}`);
+    return;
+  }
+  savePrefs({ movedOnlineAt: new Date().toISOString(), movedFile: file });
+  log("move online: done");
+  await dialog.showMessageBox(win, {
+    message: "Done: your data is online",
+    detail: `Moved ${what}.\n\nSign in with your usual username and password. The owner can now open ${BASE} on any phone or computer to see sales, stock and reports.`,
+  });
+  win.loadURL(BASE + "/login");
+}
+
+// ---------- updates ----------
+// The app checks the website for a newer version, downloads it in the background and asks to restart.
+let updater = null;
+let updateReady = false;
+function setupUpdates() {
+  if (!app.isPackaged) return;
+  try {
+    updater = require("electron-updater").autoUpdater;
+  } catch (e) {
+    log(`updates: not available: ${e.message}`);
+    return;
+  }
+  const feed = brand.updateUrl || (ONLINE ? `${BASE}/api/desktop/update` : "");
+  if (!feed) return;
+  updater.setFeedURL({ provider: "generic", url: feed });
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+  updater.logger = { info: (m) => log(`updates: ${m}`), warn: (m) => log(`updates: ${m}`), error: (m) => log(`updates: ${m}`), debug: () => {} };
+  updater.on("update-downloaded", async (info) => {
+    updateReady = true;
+    const r = await dialog.showMessageBox(win, {
+      message: `${brand.productName} ${info.version} is ready`,
+      detail: "Restart now to finish updating? It takes a few seconds. Your data is online and stays as it is.\n\nIf you choose Later, it updates the next time the app is closed.",
+      buttons: ["Restart now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (r.response === 0) {
+      quitting = true;
+      setImmediate(() => updater.quitAndInstall(false, true));
+    }
+  });
+  const check = () => updater.checkForUpdates().catch((e) => log(`updates: check failed: ${e.message}`));
+  setTimeout(check, 30 * 1000);
+  setInterval(check, 4 * 60 * 60 * 1000);
+}
+
+async function checkForUpdatesNow() {
+  if (!updater) {
+    dialog.showMessageBox(win, { message: "Updates", detail: app.isPackaged ? "Updates are not available in this copy." : "Updates only work in the installed app." });
+    return;
+  }
+  try {
+    const r = await updater.checkForUpdates();
+    const latest = r && r.updateInfo && r.updateInfo.version;
+    if (!latest || latest === app.getVersion()) {
+      dialog.showMessageBox(win, { message: "You're up to date", detail: `${brand.productName} ${app.getVersion()} is the newest version.` });
+    } else {
+      dialog.showMessageBox(win, { message: `Downloading ${brand.productName} ${latest}…`, detail: "You'll be asked to restart when it's ready." });
+    }
+  } catch (e) {
+    dialog.showErrorBox("Couldn't check for updates", e.message);
+  }
+}
+
 // ---------- online mode ----------
 function offlinePage(msg) {
   return "data:text/html;charset=utf-8," + encodeURIComponent(
@@ -542,6 +718,12 @@ app.whenReady().then(async () => {
   createWindow();
   if (ONLINE) {
     openOnline();
+    setupUpdates();
+    // Offline data from an earlier version on this PC: offer once to move it online.
+    const p = readPrefs();
+    if (hasOfflineData() && !p.movedOnlineAt && !p.moveAskedAt) {
+      win.webContents.once("did-finish-load", () => setTimeout(() => moveOfflineDataOnline(false), 1500));
+    }
     setTimeout(() => backupNow(false), 2 * 60 * 1000);
     setInterval(() => backupNow(false), 3 * 60 * 60 * 1000);
     setTimeout(() => offerCloudOnce(), 30 * 1000);
@@ -569,7 +751,13 @@ app.on("before-quit", async (e) => {
   if (ONLINE) {
     e.preventDefault();
     quitting = true;
-    try { await Promise.race([backupNow(false), new Promise((r) => setTimeout(r, 15000))]); } finally { app.exit(0); }
+    try {
+      await Promise.race([backupNow(false), new Promise((r) => setTimeout(r, 15000))]);
+    } finally {
+      // An update downloaded earlier ("Later") installs now, silently, and the app opens again next time.
+      if (updater && updateReady) updater.quitAndInstall(true, false);
+      else app.exit(0);
+    }
     return;
   }
   if (!server) return;

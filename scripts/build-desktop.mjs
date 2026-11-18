@@ -40,13 +40,16 @@ fs.rmSync(path.join(server, ".env"), { force: true });
 
 const appDir = path.join(out, "app");
 fs.mkdirSync(appDir, { recursive: true });
-for (const f of ["main.cjs", "backup.cjs", "license.cjs", "preload.cjs", "activate.html", "printers.html"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
+for (const f of ["main.cjs", "backup.cjs", "license.cjs", "migrate-dump.cjs", "preload.cjs", "activate.html", "printers.html"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
 fs.copyFileSync(path.join(brandDir, "brand.json"), path.join(appDir, "brand.json"));
 fs.copyFileSync(path.join(brandDir, "icon.png"), path.join(appDir, "icon.png"));
+// The desktop shell's own packages: the updater, and PGlite to read an older offline database when moving it online.
+const appDeps = { "electron-updater": "^6.6.2", "@electric-sql/pglite": pkg.dependencies["@electric-sql/pglite"] };
 fs.writeFileSync(
   path.join(appDir, "package.json"),
-  JSON.stringify({ name: brand.executableName.toLowerCase().replace(/[^a-z0-9-]/g, "-"), productName: brand.productName, version: brand.version || pkg.version, main: "main.cjs", description: brand.productName, author: brand.supportName || "" }, null, 2),
+  JSON.stringify({ name: brand.executableName.toLowerCase().replace(/[^a-z0-9-]/g, "-"), productName: brand.productName, version: brand.version || pkg.version, main: "main.cjs", description: brand.productName, author: brand.supportName || "", dependencies: appDeps }, null, 2),
 );
+run(`npm install --omit=dev --no-audit --no-fund --no-package-lock --prefix "${appDir}"`);
 
 const config = {
   appId: brand.appId,
@@ -58,11 +61,11 @@ const config = {
   // folder and pick server/** — the server's node_modules (Next, PGlite, pg...) then gets included.
   extraResources: online ? [] : [{ from: out, to: ".", filter: ["server/**/*"] }],
   asar: true,
-  // The desktop shell uses only Electron and Node built-ins. Without this, electron-builder falls back to the
-  // project's node_modules (Next, React…) and the installer triples in size.
-  files: ["**/*", "!**/node_modules/**"],
-  // No auto-update feed: installers are handed to each shop directly.
-  publish: null,
+  // PGlite loads its database engine files from disk, so keep it outside the asar archive.
+  asarUnpack: ["node_modules/@electric-sql/**"],
+  // With SHOPDESK_PUBLISH=1 (GitHub Actions on a version tag) the installer goes to a GitHub release;
+  // the website (/api/desktop/update) hands it to the installed apps.
+  publish: process.env.SHOPDESK_PUBLISH ? [{ provider: "github", owner: "iamshebi", repo: "shopdesk-erp", releaseType: "release" }] : null,
   win: { target: [{ target: "nsis", arch: ["x64"] }], icon: path.join(brandDir, "icon.png") },
   nsis: {
     oneClick: false,
@@ -72,12 +75,14 @@ const config = {
     createStartMenuShortcut: true,
     shortcutName: brand.productName,
     artifactName: `${brand.executableName}-Setup-\${version}.\${ext}`,
+    // Updates install over the old version without asking for the folder again.
+    deleteAppDataOnUninstall: false,
   },
 };
 fs.writeFileSync(path.join(out, "builder.json"), JSON.stringify(config, null, 2));
 console.log(`✔ Prepared desktop-dist for ${brand.productName}`);
 
 if (args.includes("--pack")) {
-  run(`npx electron-builder --win --config "${path.join(out, "builder.json")}" --publish never`);
+  run(`npx electron-builder --win --config "${path.join(out, "builder.json")}" --publish ${process.env.SHOPDESK_PUBLISH ? "always" : "never"}`);
   console.log(`✔ Installer in release/${brandName}/`);
 }
