@@ -11,10 +11,11 @@ const fs = require("fs");
 const os = require("os");
 const { execFileSync } = require("child_process");
 
-// Public half of the licence key pair. The private half is kept only by the seller (never in this repo).
-const PUBLIC_KEY_B64 = "MCowBQYDK2VwAyEAx9MNCzWltEUTynEWdHkiMri5ITnuF256wHB8Ud9PqmI=";
+// Public half of the DOLLAR44 licence key pair (same pair as the monthly keys in src/lib/license.ts).
+// The private half is kept only by DOLLAR44 (never in this repo).
+const PUBLIC_KEY_B64 = "MCowBQYDK2VwAyEAK13MMsYEXHZOgJ36ycK/RzKkz60X3DT5FG9V5kjJlds=";
 
-const KEY_PREFIX = "SD1";
+const KEY_PREFIX = "D44PC";
 // Crockford base32: no I, L, O, U, so keys are easy to read out over the phone.
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 

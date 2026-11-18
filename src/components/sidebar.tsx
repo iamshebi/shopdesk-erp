@@ -123,7 +123,7 @@ export default function Sidebar(props: { shopName: string; logo: string; userNam
         )}
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{props.shopName}</div>
-          <div className="text-[11px] text-slate-400">ShopDesk ERP</div>
+          <div className="text-[11px] text-slate-400">DOLLAR44 ERP</div>
         </div>
         <Link href="/notifications" onClick={() => setOpen(false)} className="relative ml-auto rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`} title="Notifications">
           <Bell size={18} />

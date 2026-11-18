@@ -1,4 +1,4 @@
-// Windows desktop shell: runs the ShopDesk server on this computer and shows it in a window.
+// Windows desktop shell: runs the DOLLAR44 ERP server on this computer and shows it in a window.
 // Data lives in %APPDATA%\<Product>\data. Other devices on the shop Wi-Fi can open http://<this-PC-IP>:<port>.
 const { app, BrowserWindow, Menu, dialog, shell, nativeTheme, ipcMain, clipboard } = require("electron");
 const path = require("path");
@@ -29,6 +29,21 @@ nativeTheme.themeSource = "light";
 
 const userData = app.getPath("userData");
 const dataDir = path.join(userData, "data");
+
+// Shops that installed the app under an earlier name keep their data: copy it across once.
+(function moveLegacyData() {
+  if (fs.existsSync(dataDir)) return;
+  for (const name of brand.legacyDataFolders || []) {
+    const old = path.join(app.getPath("appData"), name);
+    if (old === userData || !fs.existsSync(path.join(old, "data"))) continue;
+    try {
+      fs.mkdirSync(userData, { recursive: true });
+      fs.cpSync(path.join(old, "data"), dataDir, { recursive: true });
+      if (fs.existsSync(path.join(old, "backup.key"))) fs.copyFileSync(path.join(old, "backup.key"), path.join(userData, "backup.key"));
+    } catch {}
+    return;
+  }
+})();
 const backupDir = path.join(app.getPath("documents"), `${brand.productName} Backups`);
 const logFile = path.join(userData, "server.log");
 const licenseFile = path.join(userData, "license.json");
@@ -134,7 +149,7 @@ function lanAddresses() {
 
 // ---------- licence ----------
 function supportText() {
-  return [brand.supportName, brand.supportPhone].filter(Boolean).join(" · ");
+  return [brand.supportName, brand.supportPhone, brand.supportEmail].filter(Boolean).join(" · ");
 }
 
 /** Shows the activation window until a valid key is entered. Resolves true when activated, false if the user exits. */
@@ -156,7 +171,7 @@ function requireActivation() {
     });
     w.setMenu(null);
     const fromThis = (e) => e.sender === w.webContents;
-    ipcMain.handle("sd:license-info", (e) => fromThis(e) && { requestCode: state.requestCode, productName: brand.productName, support: supportText() });
+    ipcMain.handle("sd:license-info", (e) => fromThis(e) && { requestCode: state.requestCode, productName: brand.productName, support: supportText(), whatsapp: !!String(brand.supportPhone || "").replace(/[^0-9]/g, ""), contact: [brand.supportEmail, brand.supportWebsite && brand.supportWebsite.replace(/^https?:\/\/(www\.)?instagram\.com\//, "Instagram @")].filter(Boolean).join(" · ") });
     ipcMain.handle("sd:license-activate", (e, key) => {
       if (!fromThis(e)) return false;
       if (!license.verifyActivationKey(state.requestCode, key)) return false;
@@ -434,6 +449,7 @@ function buildMenu() {
               message: `${brand.productName} ${app.getVersion()}`,
               detail: [
                 brand.supportName && `Support: ${brand.supportName}`,
+                brand.supportEmail,
                 brand.supportPhone,
                 brand.supportWebsite,
                 LICENSE_ON && `\nLicence: activated on this computer (${license.getRequestCode(brand.appId)})`,

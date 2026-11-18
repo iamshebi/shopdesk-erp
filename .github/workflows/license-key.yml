@@ -1,0 +1,33 @@
+name: Issue activation key
+
+# Actions → Issue activation key → Run workflow. The key appears in the run's summary.
+# Needs the repository secret D44_LICENSE_PRIVATE_KEY (Settings → Secrets and variables → Actions).
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: "Client / shop name"
+        required: true
+      months:
+        description: "Months (1 = monthly, 12 = yearly)"
+        required: true
+        default: "1"
+      start:
+        description: "Start date YYYY-MM-DD (empty = today)"
+        required: false
+        default: ""
+
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - env:
+          D44_LICENSE_PRIVATE_KEY: ${{ secrets.D44_LICENSE_PRIVATE_KEY }}
+          CLIENT: ${{ github.event.inputs.client }}
+          MONTHS: ${{ github.event.inputs.months }}
+          START: ${{ github.event.inputs.start }}
+        run: node scripts/license.mjs --client "$CLIENT" --months "$MONTHS" ${START:+--start "$START"}

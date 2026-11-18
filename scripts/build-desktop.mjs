@@ -15,6 +15,12 @@ if (!fs.existsSync(path.join(brandDir, "brand.json"))) {
   process.exit(1);
 }
 const brand = JSON.parse(fs.readFileSync(path.join(brandDir, "brand.json"), "utf8"));
+// --url https://client-site.ae  -> this installer opens that client's live site (online mode) instead of
+// running its own database on the PC. Lets DOLLAR44 make a client-specific build without editing brand.json.
+if (args.includes("--url") && args[args.indexOf("--url") + 1]) {
+  brand.mode = "online";
+  brand.url = args[args.indexOf("--url") + 1];
+}
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const electronVersion = JSON.parse(fs.readFileSync(path.join(root, "node_modules/electron/package.json"), "utf8")).version;
 const run = (cmd, env = {}) => execSync(cmd, { cwd: root, stdio: "inherit", env: { ...process.env, ...env } });
@@ -41,7 +47,7 @@ fs.rmSync(path.join(server, ".env"), { force: true });
 const appDir = path.join(out, "app");
 fs.mkdirSync(appDir, { recursive: true });
 for (const f of ["main.cjs", "backup.cjs", "license.cjs", "preload.cjs", "activate.html", "printers.html"]) fs.copyFileSync(path.join(root, "desktop", f), path.join(appDir, f));
-fs.copyFileSync(path.join(brandDir, "brand.json"), path.join(appDir, "brand.json"));
+fs.writeFileSync(path.join(appDir, "brand.json"), JSON.stringify(brand, null, 2));
 fs.copyFileSync(path.join(brandDir, "icon.png"), path.join(appDir, "icon.png"));
 fs.writeFileSync(
   path.join(appDir, "package.json"),

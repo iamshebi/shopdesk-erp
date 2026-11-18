@@ -97,7 +97,7 @@ export async function publishToWebsite(fd: FormData) {
     added = built.added; updated = built.updated;
     summary = `${added} added, ${updated} updated`;
     const lines = built.changes.slice(0, 40).map((l) => `- ${l}`).join("\n");
-    commit = await commitCatalog(built.catalog, sha, `Update from ShopDesk ERP by ${user.name}: ${summary}\n\n${lines}${built.changes.length > 40 ? `\n- …and ${built.changes.length - 40} more` : ""}`);
+    commit = await commitCatalog(built.catalog, sha, `Update from DOLLAR44 ERP by ${user.name}: ${summary}\n\n${lines}${built.changes.length > 40 ? `\n- …and ${built.changes.length - 40} more` : ""}`);
     await tx(async (t) => {
       for (const l of built.newLinks) await t("UPDATE products SET web_id=$2 WHERE id=$1", [l.id, l.web_id]);
       await t("INSERT INTO website_publishes (summary, added, updated, commit_sha, user_id) VALUES ($1,$2,$3,$4,$5)", [built.changes.join("\n").slice(0, 20000), added, updated, commit, user.id]);

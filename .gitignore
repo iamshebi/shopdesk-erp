@@ -9,3 +9,6 @@ AGENTS.md
 
 /desktop-dist
 /release
+
+# DOLLAR44 licence signing key: never commit
+*.pem

@@ -28,12 +28,12 @@
   <h1 id="title">Activate</h1>
   <div class="sub">This copy needs a one-time activation for this computer. No internet needed.</div>
 
-  <div class="step">1 · Send this code to your supplier</div>
+  <div class="step">1 · Send this code to DOLLAR44</div>
   <div class="code"><span id="req">…</span><button id="copy">Copy</button></div>
-  <div class="row"><button class="wa" id="wa">Send on WhatsApp</button><span class="grow"></span></div>
+  <div class="row"><button class="wa" id="wa" hidden>Send on WhatsApp</button><span id="contact" class="grow" style="color:#64748b"></span></div>
 
   <div class="step">2 · Paste the activation key you receive</div>
-  <textarea id="key" placeholder="SD1-XXXXXX-XXXXXX-…" spellcheck="false"></textarea>
+  <textarea id="key" placeholder="D44PC-XXXXXX-XXXXXX-…" spellcheck="false"></textarea>
   <div class="err" id="err"></div>
   <div class="row"><button class="primary" id="activate">Activate</button><span class="grow"></span><button id="quit">Exit</button></div>
   <div class="foot" id="foot"></div>
@@ -46,6 +46,8 @@ api.info().then((i) => {
   $("title").textContent = `Activate ${i.productName}`;
   document.title = `Activate ${i.productName}`;
   $("foot").textContent = i.support ? `Support: ${i.support}` : "";
+  $("wa").hidden = !i.whatsapp;
+  $("contact").textContent = i.contact || "";
 });
 $("copy").onclick = async () => { await api.copy($("req").textContent); $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy"), 1500); };
 $("wa").onclick = () => api.whatsapp();

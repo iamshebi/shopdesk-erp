@@ -7,6 +7,10 @@ on:
         description: "Brand folder in brands/ (e.g. default)"
         required: true
         default: default
+      url:
+        description: "Client website for online mode (empty = offline, own database on the PC)"
+        required: false
+        default: ""
   push:
     tags: ["v*"]
 
@@ -20,7 +24,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
+      - shell: bash
+        env:
+          BRAND: ${{ github.event.inputs.brand || 'default' }}
+          URL: ${{ github.event.inputs.url }}
+        run: node scripts/build-desktop.mjs --brand "$BRAND" ${URL:+--url "$URL"} --pack
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ github.event.inputs.brand || 'default' }}

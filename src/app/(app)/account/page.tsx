@@ -21,7 +21,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   let qr = "", secret = "";
   if (sp.setup && !u.totp_enabled && u.totp_secret) {
     secret = await decryptField(u.totp_secret);
-    qr = await QRCode.toDataURL(otpauthUri(secret, me.username, s.shop_name || "ShopDesk"), { margin: 1, width: 220 });
+    qr = await QRCode.toDataURL(otpauthUri(secret, me.username, s.shop_name || "DOLLAR44 ERP"), { margin: 1, width: 220 });
   }
   const sessions = await q<any>("SELECT id, ip, user_agent, created_at, last_seen_at FROM sessions WHERE user_id=$1 AND revoked_at IS NULL ORDER BY last_seen_at DESC", [me.id]);
   const logins = await q<any>("SELECT success, reason, ip, user_agent, created_at FROM login_events WHERE user_id=$1 ORDER BY id DESC LIMIT 10", [me.id]);
@@ -39,7 +39,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {u.totp_enabled ? <ShieldCheck size={18} className="text-emerald-600" /> : <ShieldOff size={18} className="text-slate-400" />}
             Two-step verification {u.totp_enabled ? <Badge tone="green">On</Badge> : <Badge>Off</Badge>}
           </div>
-          <p className="mb-4 text-sm text-slate-500">After your password, ShopDesk asks for a 6-digit code from an authenticator app on your phone. A stolen password alone is then not enough.</p>
+          <p className="mb-4 text-sm text-slate-500">After your password, DOLLAR44 ERP asks for a 6-digit code from an authenticator app on your phone. A stolen password alone is then not enough.</p>
           {u.totp_enabled ? (
             <form action={disable2fa} className="space-y-3">
               <Field label="Your password, to turn it off"><input name="password" type="password" className="input" required autoComplete="current-password" /></Field>
