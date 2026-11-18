@@ -9,7 +9,7 @@ export default async function SetupPage() {
     <main className="grid min-h-screen place-items-center p-6">
       <div className="w-full max-w-md fade-in">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome to ShopDesk</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome to DOLLAR44 ERP</h1>
           <p className="mt-1 text-sm text-slate-500">Set up the shop and the owner account. You can change everything later in Settings.</p>
         </div>
         <SetupForm />

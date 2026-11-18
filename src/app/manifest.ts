@@ -3,14 +3,14 @@ import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
-// Makes ShopDesk installable as an app: "Add to Home screen" on Android / Samsung DeX,
+// Makes DOLLAR44 ERP installable as an app: "Add to Home screen" on Android / Samsung DeX,
 // "Install app" in Chrome or Edge on Windows. Opens in its own window without browser bars.
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const s = await getSettings().catch(() => null);
-  const name = s?.shop_name ? `${s.shop_name} · ShopDesk` : "ShopDesk ERP";
+  const name = s?.shop_name ? `${s.shop_name} · DOLLAR44 ERP` : "DOLLAR44 ERP";
   return {
     name,
-    short_name: s?.shop_name || "ShopDesk",
+    short_name: s?.shop_name || "DOLLAR44 ERP",
     description: "Billing, stock, repairs and VAT invoices",
     start_url: "/",
     scope: "/",

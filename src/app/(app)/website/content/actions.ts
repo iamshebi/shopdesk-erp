@@ -58,7 +58,7 @@ export async function publishSiteContent() {
     const cur = await fetch(`${api}?ref=${encodeURIComponent(c.branch)}`, { headers: h, cache: "no-store" });
     const sha = cur.ok ? (await cur.json()).sha : undefined;
     const body = { ...content, banners: content.banners.filter((b) => b.active), promos: content.promos.filter((p) => p.active), delivery_zones: zones, v: Date.now() };
-    const r = await fetch(api, { method: "PUT", headers: h, body: JSON.stringify({ message: "Website content from ShopDesk ERP", content: Buffer.from(JSON.stringify(body, null, 1)).toString("base64"), sha, branch: c.branch }) });
+    const r = await fetch(api, { method: "PUT", headers: h, body: JSON.stringify({ message: "Website content from DOLLAR44 ERP", content: Buffer.from(JSON.stringify(body, null, 1)).toString("base64"), sha, branch: c.branch }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || `GitHub error ${r.status}`);
   } catch (e: any) { go(e?.message ?? "Publishing failed", "err"); }
   await q("INSERT INTO website_publishes (user_id, summary, added, updated, commit_sha) VALUES ($1,$2,0,0,'')", [user.id, `Content published to ${path}`]);

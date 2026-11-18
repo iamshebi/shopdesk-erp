@@ -14,7 +14,7 @@ export async function makeBackup() {
 }
 
 export async function restoreBackup(data: any) {
-  if (data?.app !== "shopdesk" || !data.tables) throw new Error("This is not a ShopDesk backup file");
+  if (data?.app !== "shopdesk" || !data.tables) throw new Error("This is not a DOLLAR44 ERP backup file");
   await tx(async (t) => {
     const [secret] = await t<{ value: string }>("SELECT value FROM settings WHERE key='session_secret'");
     await t(`TRUNCATE ${BACKUP_TABLES.join(", ")} RESTART IDENTITY CASCADE`);

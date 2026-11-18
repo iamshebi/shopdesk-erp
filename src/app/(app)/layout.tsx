@@ -7,12 +7,16 @@ import IdleLogout from "@/components/idle-logout";
 import CommandPalette from "@/components/command-palette";
 import PageTools from "@/components/page-tools";
 import { getPref, type PageRef } from "@/lib/prefs";
+import { getLicenseStatus } from "@/lib/license";
+import LicenseBanner from "@/components/license-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const n = await one<{ n: number }>("SELECT count(*)::int AS n FROM users");
   if (!n?.n) redirect("/setup");
   const user = await getUser();
   if (!user) redirect("/login");
+  const lic = await getLicenseStatus();
+  if (lic.locked) redirect("/activate");
   const s = await getSettings();
   const NAV_PERMS: Record<string, string[]> = {
     dashboard: [], pos: ["pos"], orders: ["orders"], website: ["website"], accounting: ["accounting"], crm: ["crm"], support: ["support"], hr: ["hr", "payroll"], tasks: ["tasks"], marketing: ["marketing"], shipping: ["shipping"], automation: ["integrations"], sales: ["sales.view"], repairs: ["repairs"], buyback: ["buyback"], products: ["products.view"], imei: ["imei"],
@@ -85,7 +89,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         settingsHref={canAny(user, ["settings"]) ? "/settings" : canAny(user, ["staff"]) ? "/settings/staff" : canAny(user, ["data"]) ? "/settings/data" : canAny(user, ["integrations"]) ? "/settings/integrations" : "/settings/activity"}
       />
       <IdleLogout minutes={s.idle_timeout_minutes} />
-      <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8"><PageTools pins={pins} recent={recent} />{children}</main>
+      <main className="min-w-0 flex-1 px-4 pb-24 pt-16 md:px-8 md:pb-10 md:pt-8"><LicenseBanner state={lic.state} daysLeft={lic.daysLeft} endsOn={lic.endsOn} canRenew={canAny(user, ["settings"])} /><PageTools pins={pins} recent={recent} />{children}</main>
     </div>
   );
 }

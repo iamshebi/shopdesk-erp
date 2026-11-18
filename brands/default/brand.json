@@ -1,9 +1,11 @@
 {
-  "productName": "ShopDesk",
-  "appId": "xyz.iamshebi.shopdesk",
-  "executableName": "ShopDesk",
+  "productName": "DOLLAR44 ERP",
+  "appId": "ae.dollar44.erp",
+  "executableName": "DOLLAR44-ERP",
   "port": 4300,
-  "supportName": "SHABEEB · iamshebi.xyz",
+  "supportName": "DOLLAR44 · Ras Al Khaimah",
+  "supportEmail": "dollar44.uae@gmail.com",
   "supportPhone": "",
-  "supportWebsite": "https://iamshebi.xyz"
+  "supportWebsite": "https://instagram.com/dollar44.uae",
+  "legacyDataFolders": ["ShopDesk"]
 }

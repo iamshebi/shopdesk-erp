@@ -1,7 +1,26 @@
-# ShopDesk ERP
+# DOLLAR44 ERP
 
-A white-label billing, stock and repair system for mobile phone and electronics shops in the UAE.
-One codebase. Each shop gets its own copy (own database, own logo, own name).
+Billing, stock and repair ERP for shops in the UAE, by **DOLLAR44** (Ras Al Khaimah) · dollar44.uae@gmail.com · Instagram @dollar44.uae.
+One codebase. Each client gets their own copy (own database, their own shop name and logo inside); the software name stays DOLLAR44 ERP.
+
+## Subscriptions and activation keys
+
+Clients pay monthly (or yearly) and get an **activation key** for that period.
+
+* A new install runs a **14-day trial**. After a key ends there are **5 grace days** with a red warning, then the app locks
+  on the activation screen until a new key is entered. Data is never deleted; the owner can still download a backup.
+* Keys are signed with DOLLAR44's private key (Ed25519); the app holds only the public key, so a shop cannot make or edit one.
+  Turning the computer's clock back does not extend a key.
+* The owner enters the key at **Settings → Subscription** (`/activate`).
+
+**Issue a key** (DOLLAR44 only):
+* On GitHub: *Actions → Issue activation key → Run workflow* (client name, months, optional start date). The key is in the run summary.
+  One-time setup: add the repository secret `D44_LICENSE_PRIVATE_KEY` with the contents of `dollar44-license-private.pem`.
+* Or on a computer that holds the private key: `node scripts/license.mjs --client "Kenz Mobile Phones" --months 1`
+  (renewal: add `--start` with the day after the old key ends).
+
+Keep `dollar44-license-private.pem` safe and private. If it leaks, anyone could make keys; if it is lost, a new pair must be
+made and the public key in `src/lib/license.ts` replaced in every client's next update.
 
 ## What's inside
 
@@ -36,7 +55,7 @@ Each client gets their own installer with their name and icon. Data stays on the
 (`%APPDATA%\<Product>\data`), a backup is saved automatically every day to `Documents\<Product> Backups` (last 30 kept),
 and other counters / phones on the shop Wi-Fi can open the address shown in **File → Use on other devices**.
 
-**Make a new client brand:** copy `brands/default` to `brands/<client>`, edit `brand.json` (productName, executableName, appId)
+**Make a new installer brand (normally not needed: every client uses the DOLLAR44 ERP installer and sets their own logo in Settings):** copy `brands/default` to `brands/<client>`, edit `brand.json` (productName, executableName, appId)
 and replace `icon.png` (512×512). The shop's logo, colours, TRN and invoice details are then set inside the app's Settings.
 
 **Build the installer (free, no Windows PC needed):** on GitHub open *Actions → Build Windows installer → Run workflow*,

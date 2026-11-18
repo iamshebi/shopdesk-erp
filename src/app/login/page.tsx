@@ -27,6 +27,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
         {sp.idle && <div className="card mb-4 bg-amber-50 p-3 text-center text-sm text-amber-800">You were signed out after a period of no activity.</div>}
         <LoginForm />
+        <a href="https://instagram.com/dollar44.uae" target="_blank" rel="noreferrer" className="mt-10 flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-slate-600">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/app-icon-192.png" alt="" className="h-5 w-5 rounded" /> Powered by DOLLAR44
+        </a>
       </div>
     </main>
   );

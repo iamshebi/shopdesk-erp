@@ -9,8 +9,8 @@ import { maybeFactoryReset } from "@/lib/backup";
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings().catch(() => null);
   return {
-    title: s?.shop_name ? `${s.shop_name} · ShopDesk` : "ShopDesk",
-    appleWebApp: { capable: true, title: s?.shop_name || "ShopDesk", statusBarStyle: "default" },
+    title: s?.shop_name ? `${s.shop_name} · DOLLAR44 ERP` : "DOLLAR44 ERP",
+    appleWebApp: { capable: true, title: s?.shop_name || "DOLLAR44 ERP", statusBarStyle: "default" },
     icons: { apple: "/app-icon-192.png" },
   };
 }
@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <html lang="en">
         <body className="min-h-screen font-sans grid place-items-center p-6">
           <div className="max-w-md rounded-xl border bg-white p-6 text-sm leading-6">
-            <h1 className="text-lg font-semibold mb-2">ShopDesk: database not connected yet</h1>
+            <h1 className="text-lg font-semibold mb-2">DOLLAR44 ERP: database not connected yet</h1>
             <p>
               Add a Postgres database to this Vercel project (Storage → Neon or Supabase → Connect), make sure the
               <code> DATABASE_URL</code> variable is set, then redeploy. The setup screen appears after that.

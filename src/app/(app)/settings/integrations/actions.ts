@@ -32,7 +32,7 @@ export async function saveEmailSettings(fd: FormData) {
 export async function testEmail(fd: FormData) {
   await requireUser("integrations");
   const s = await getSettings();
-  const r = await sendEmail(str(fd, "to"), `Test email from ${s.shop_name}`, `<p>Email from ShopDesk ERP is working.</p>`);
+  const r = await sendEmail(str(fd, "to"), `Test email from ${s.shop_name}`, `<p>Email from DOLLAR44 ERP is working.</p>`);
   go(r.ok ? `Test email sent to ${str(fd, "to")}` : r.error ?? "Failed", r.ok ? "ok" : "err");
 }
 
@@ -95,7 +95,7 @@ export async function deleteWebhook(fd: FormData) {
 
 export async function testWebhook() {
   await requireUser("integrations");
-  await fireWebhook("test", { hello: "from ShopDesk ERP" });
+  await fireWebhook("test", { hello: "from DOLLAR44 ERP" });
   revalidatePath(P);
   go("Test event sent. See deliveries below.");
 }

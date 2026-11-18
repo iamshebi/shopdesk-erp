@@ -98,7 +98,7 @@ export async function dailySummaryEmail(base: string) {
   const html = `<div style="font-family:Arial,sans-serif;color:#1e293b"><h2>${esc(s.shop_name)}: yesterday</h2><table>
     ${row("Sales", `${s.currency} ${num(y.sales)} (${y.n} invoices)`)}${row("Gross profit", `${s.currency} ${num(y.gp)}`)}${row("Customers owe", `${s.currency} ${num(due.d)}`)}
     ${row("Orders to fulfil", String(orders.n))}${row("Open tickets", String(tickets.n))}${row("Products at or below reorder level", String(low.n))}</table>
-    <p><a href="${base}">Open ShopDesk</a></p></div>`;
+    <p><a href="${base}">Open DOLLAR44 ERP</a></p></div>`;
   return (await sendEmail(s.daily_report_email, `${s.shop_name} daily summary`, html)).ok;
 }
 

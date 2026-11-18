@@ -48,7 +48,7 @@ export async function clientInfo() {
 export function deviceName(ua: string) {
   if (!ua) return "Unknown device";
   const os = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? (/SM-|Samsung/i.test(ua) ? "Samsung Android" : "Android") : /iPhone|iPad/.test(ua) ? "iPhone/iPad" : /Mac OS X/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "Other";
-  const br = /Electron/.test(ua) ? "ShopDesk app" : /Edg\//.test(ua) ? "Edge" : /SamsungBrowser/.test(ua) ? "Samsung Internet" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const br = /Electron/.test(ua) ? "DOLLAR44 ERP app" : /Edg\//.test(ua) ? "Edge" : /SamsungBrowser/.test(ua) ? "Samsung Internet" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
   return `${br} on ${os}`;
 }
 
