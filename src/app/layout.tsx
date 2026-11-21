@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: s?.shop_name ? `${s.shop_name} · ShopDesk` : "ShopDesk",
     appleWebApp: { capable: true, title: s?.shop_name || "ShopDesk", statusBarStyle: "default" },
-    icons: { apple: "/app-icon-192.png" },
+    icons: { apple: "/apple-touch-icon.png" },
   };
 }
 
