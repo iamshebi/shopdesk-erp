@@ -84,6 +84,15 @@ fs.writeFileSync(path.join(out, "builder.json"), JSON.stringify(config, null, 2)
 console.log(`✔ Prepared desktop-dist for ${brand.productName}`);
 
 if (args.includes("--pack")) {
-  run(`npx electron-builder --win --config "${path.join(out, "builder.json")}" --publish ${process.env.SHOPDESK_PUBLISH ? "always" : "never"}`);
+  // Upload is done here with the GitHub CLI (electron-builder's own uploader kept failing on the big installer).
+  run(`npx electron-builder --win --config "${path.join(out, "builder.json")}" --publish never`);
   console.log(`✔ Installer in release/${brandName}/`);
+  if (process.env.SHOPDESK_PUBLISH) {
+    const relDir = path.join(root, "release", brandName);
+    const files = fs.readdirSync(relDir).filter((f) => /\.exe$|\.exe\.blockmap$|^latest\.yml$/.test(f)).map((f) => `"${path.join(relDir, f)}"`);
+    const v = brand.version || pkg.version;
+    console.log(`▶ Publishing release v${v}: ${files.join(" ")}`);
+    run(`gh release create "v${v}" ${files.join(" ")} --repo iamshebi/shopdesk-erp --title "ShopDesk ${v}" --notes "ShopDesk desktop ${v}" --latest`);
+    console.log(`✔ Published release v${v}`);
+  }
 }

@@ -40,18 +40,12 @@ jobs:
           if gh release view "v$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=1" >> "$GITHUB_OUTPUT"; else echo "exists=" >> "$GITHUB_OUTPUT"; fi
       - if: ${{ !(github.event_name == 'push' && steps.ver.outputs.exists) }}
         run: npm ci
-      - name: Build installer
+      - name: Build (and publish new versions)
         if: ${{ !(github.event_name == 'push' && steps.ver.outputs.exists) }}
         run: node scripts/build-desktop.mjs --brand ${{ github.event.inputs.brand || 'default' }} --pack
-      - name: Publish release
-        if: ${{ github.event_name == 'push' && !steps.ver.outputs.exists }}
-        shell: bash
         env:
+          SHOPDESK_PUBLISH: ${{ github.event_name == 'push' && '1' || '' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          v="${{ steps.ver.outputs.version }}"
-          ls -la release/default
-          gh release create "v$v" release/default/*.exe release/default/*.exe.blockmap release/default/latest.yml --repo "$GITHUB_REPOSITORY" --title "ShopDesk $v" --notes "ShopDesk desktop $v" --latest
       - uses: actions/upload-artifact@v4
         if: ${{ !(github.event_name == 'push' && steps.ver.outputs.exists) }}
         with:
