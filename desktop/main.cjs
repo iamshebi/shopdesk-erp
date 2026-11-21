@@ -295,6 +295,16 @@ function backupStatus() {
 // ---------- printing ----------
 // Per job type: which printer, and print with no margins/headers. With no printer chosen, Windows asks.
 // size: label "50x25" (mm), or receipt paper width "80" / "58". receiptMm: measured receipt length.
+// Receipts used to default to an exact-length page, which some thermal drivers cut after a few lines.
+// From 2.3.2 the long page is the default, once also for PCs that had saved the old default.
+function receiptMode() {
+  const p = readPrefs();
+  if (!p.receiptLengthV2) {
+    savePrefs({ receiptLength: p.receiptLength === "driver" ? "driver" : "long", receiptLengthV2: true });
+    return p.receiptLength === "driver" ? "driver" : "long";
+  }
+  return ["auto", "long", "driver"].includes(p.receiptLength) ? p.receiptLength : "long";
+}
 function printOptions(kind, size, receiptMm) {
   const device = (readPrefs().printers || {})[kind] || "";
   const opts = { silent: !!device, printBackground: true, header: "", footer: "", margins: { marginType: kind === "a4" ? "default" : "none" } };
@@ -302,15 +312,15 @@ function printOptions(kind, size, receiptMm) {
   const m = /^(\d{2,3})x(\d{2,3})$/.exec(String(size || ""));
   if (kind === "label" && m) opts.pageSize = { width: Number(m[1]) * 1000, height: Number(m[2]) * 1000 };
   // Receipts (File → Printer setup → Receipt length):
-  //  "auto"   page as long as the receipt plus room for the cutter, so the roll isn't wasted;
-  //  "long"   a 297 mm page, for drivers that stop early with a custom length (the driver cuts after the content);
+  //  "long"   (default) page of at least 297 mm, longer if the receipt is longer; the printer cuts after the text.
+  //           Thermal drivers that stop after a few lines with an exact short page print the whole receipt this way;
+  //  "auto"   page exactly as long as the receipt plus room for the cutter (saves paper, but some drivers cut it short);
   //  "driver" no page size at all: the printer driver's own paper setting decides.
-  // A measurement that looks wrong (less than 6 cm) falls back to the long page, so a receipt is never cut short.
   if (kind === "receipt") {
     const width = String(size) === "58" ? 58 : 80;
-    const mode = readPrefs().receiptLength || "auto";
-    if (mode === "long" || (mode === "auto" && !(receiptMm >= 60))) opts.pageSize = { width: width * 1000, height: 297000 };
-    else if (mode === "auto") opts.pageSize = { width: width * 1000, height: Math.round(Math.min(3000, receiptMm + 12) * 1000) };
+    const mode = receiptMode();
+    if (mode === "auto" && receiptMm >= 60) opts.pageSize = { width: width * 1000, height: Math.round(Math.min(3000, receiptMm + 12) * 1000) };
+    else if (mode !== "driver") opts.pageSize = { width: width * 1000, height: Math.round(Math.min(3000, Math.max(297, receiptMm >= 60 ? receiptMm + 12 : 0)) * 1000) };
   }
   return opts;
 }
@@ -331,7 +341,7 @@ async function measureReceiptMm(wc) {
 }
 async function printContents(wc, kind, size) {
   const receiptMm = kind === "receipt" ? await measureReceiptMm(wc) : 0;
-  if (kind === "receipt") log(`print receipt: measured ${receiptMm.toFixed(1)} mm, length setting ${readPrefs().receiptLength || "auto"}`);
+  if (kind === "receipt") log(`print receipt: measured ${receiptMm.toFixed(1)} mm, length setting ${receiptMode()}`);
   return new Promise((resolve) => {
     wc.print(printOptions(kind, size, receiptMm), (ok, reason) => {
       if (!ok && reason && reason !== "cancelled") log(`print ${kind} failed: ${reason}`);
@@ -382,13 +392,13 @@ const fromPrinters = (e) => printersWin && e.sender === printersWin.webContents;
 ipcMain.handle("sd:printers-list", async (e) => {
   if (!fromPrinters(e)) return null;
   const printers = await e.sender.getPrintersAsync();
-  return { printers: printers.map((p) => ({ name: p.name })), prefs: readPrefs().printers || {}, receiptLength: readPrefs().receiptLength || "auto" };
+  return { printers: printers.map((p) => ({ name: p.name })), prefs: readPrefs().printers || {}, receiptLength: receiptMode() };
 });
 ipcMain.handle("sd:printers-save", (e, p) => {
   if (!fromPrinters(e)) return;
   const clean = {};
   for (const k of ["receipt", "label", "a4"]) clean[k] = typeof p?.[k] === "string" ? p[k] : "";
-  savePrefs({ printers: clean, receiptLength: ["auto", "long", "driver"].includes(p?.receiptLength) ? p.receiptLength : "auto" });
+  savePrefs({ printers: clean, receiptLength: ["auto", "long", "driver"].includes(p?.receiptLength) ? p.receiptLength : "long", receiptLengthV2: true });
 });
 ipcMain.handle("sd:printers-test", async (e, kind) => {
   if (!fromPrinters(e)) return { ok: false };

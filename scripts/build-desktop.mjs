@@ -65,7 +65,8 @@ const config = {
   asarUnpack: ["node_modules/@electric-sql/**", "migrate-dump.cjs"],
   // With SHOPDESK_PUBLISH=1 (GitHub Actions on a version tag) the installer goes to a GitHub release;
   // the website (/api/desktop/update) hands it to the installed apps.
-  publish: process.env.SHOPDESK_PUBLISH ? [{ provider: "github", owner: "iamshebi", repo: "shopdesk-erp", releaseType: "release" }] : null,
+  // The publish setting is always present so electron-builder writes latest.yml (the file the updater reads); uploading is done by the workflow.
+  publish: [{ provider: "github", owner: "iamshebi", repo: "shopdesk-erp", releaseType: "release" }],
   win: { target: [{ target: "nsis", arch: ["x64"] }], icon: path.join(brandDir, "icon.png") },
   nsis: {
     oneClick: false,

@@ -32,8 +32,8 @@
   <label for="receiptLength" style="margin-top:10px">Receipt length</label>
   <div class="hint">If receipts come out cut short, choose "Long page" or "Printer's own setting" and press Test.</div>
   <select id="receiptLength">
-    <option value="auto">Fit to the receipt (saves paper)</option>
-    <option value="long">Long page (297 mm), printer cuts after the text</option>
+    <option value="long">Long page (297 mm), printer cuts after the text (recommended)</option>
+    <option value="auto">Fit to the receipt (saves paper, some printers cut it short)</option>
     <option value="driver">Printer's own paper setting</option>
   </select>
 </div>
@@ -53,7 +53,7 @@
 const api = window.shopdeskDesktop.printers;
 const $ = (id) => document.getElementById(id);
 api.list().then(({ printers, prefs, receiptLength }) => {
-  $("receiptLength").value = receiptLength || "auto";
+  $("receiptLength").value = receiptLength || "long";
   for (const kind of ["receipt", "label", "a4"]) {
     const sel = $(kind);
     sel.innerHTML = '<option value="">Ask every time</option>' + printers.map((p) => `<option>${p.name.replace(/</g, "&lt;")}</option>`).join("");
